@@ -1,0 +1,35 @@
+{
+    "name": "Cardano Hot Watch-Only Wallet",
+    "short_name": "Cardano Hot",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#0b0e14",
+    "theme_color": "#ff6b00",
+    "description": "Cardano Air-Gap Hot Watch-Only Wallet for transaction construction and network broadcast.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

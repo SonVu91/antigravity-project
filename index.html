@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <base href="/">
+  <script>
+    (function() {
+      var pathname = window.location.pathname;
+      // Tự động thêm dấu gạch chéo cuối nếu người dùng gõ thiếu /antigravity-project
+      if (pathname.endsWith('/antigravity-project')) {
+        window.location.replace(pathname + '/' + window.location.search + window.location.hash);
+        return;
+      }
+      var isSubpath = pathname.indexOf('/antigravity-project') !== -1;
+      var baseHref = isSubpath ? '/antigravity-project/' : './';
+      var baseEl = document.querySelector('base');
+      if (baseEl) {
+        baseEl.setAttribute('href', baseHref);
+      }
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="Cardano Hot Watch-Only Wallet (Air-Gap Edition) - Safe offline monitoring and transaction broadcasting for Cardano.">
+
+  <!-- Apple iOS PWA Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Cardano Hot">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Android & General Web Meta Tags -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#121418">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Cardano Hot Watch-Only Wallet</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Offline HTML5 QR Code Scanner Library -->
+  <script src="html5-qrcode.min.js"></script>
+
+  <style>
+    body {
+      background-color: #0b0e14;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Modal Overlay cho Live Camera Scanner */
+    #qr-scanner-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(10, 12, 16, 0.94);
+      z-index: 9999999;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      box-sizing: border-box;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    #qr-reader-container {
+      width: 100%;
+      max-width: 440px;
+      background: #181c24;
+      border: 2px solid #ff6b00;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 12px 36px rgba(255, 107, 0, 0.25);
+    }
+
+    #qr-reader {
+      width: 100% !important;
+      border: none !important;
+    }
+
+    #qr-reader video {
+      border-radius: 12px;
+      object-fit: cover !important;
+    }
+
+    .qr-modal-header {
+      width: 100%;
+      max-width: 440px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #ffffff;
+    }
+
+    .qr-modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #ff6b00;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .qr-modal-btn-close {
+      background: #2a2e39;
+      border: 1px solid #454d5d;
+      color: #e0e0e0;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .qr-modal-btn-close:hover {
+      background: #ff334b;
+      color: #ffffff;
+      border-color: #ff334b;
+    }
+
+    .qr-modal-tip {
+      width: 100%;
+      max-width: 440px;
+      margin-top: 14px;
+      color: #94a3b8;
+      font-size: 13px;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    /* Container vô hình để decode ảnh file */
+    #qr-hidden-reader {
+      display: none;
+    }
+  </style>
+
+  <script>
+    // Global QR Scanner Controller for Cardano Web Hot Wallet
+    window.CardanoWebQrScanner = {
+      html5QrCode: null,
+      isScanning: false,
+
+      startCamera: function() {
+        var modal = document.getElementById("qr-scanner-modal");
+        if (modal) modal.style.display = "flex";
+
+        if (!window.CardanoWebQrScanner.html5QrCode) {
+          window.CardanoWebQrScanner.html5QrCode = new Html5Qrcode("qr-reader");
+        }
+
+        var config = {
+          fps: 25,
+          qrbox: function(viewfinderWidth, viewfinderHeight) {
+            var minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            var boxSize = Math.floor(minEdge * 0.75);
+            return { width: boxSize, height: boxSize };
+          },
+          aspectRatio: 1.0,
+          videoConstraints: {
+            facingMode: { ideal: "environment" }
+          }
+        };
+
+        window.CardanoWebQrScanner.html5QrCode.start(
+          { facingMode: "environment" },
+          config,
+          function(decodedText, decodedResult) {
+            // Success Callback per frame / QR detection
+            if (window.onCardanoQrScanned) {
+              window.onCardanoQrScanned(decodedText);
+            }
+          },
+          function(errorMessage) {
+            // Ignore scan parse error per frame
+          }
+        ).catch(function(err) {
+          console.error("Camera start error:", err);
+          alert("Không thể khởi động Camera: " + err + "\n\nLưu ý: iOS Safari và Chrome yêu cầu mở trang web qua HTTPS hoặc localhost để cấp quyền truy cập Camera.");
+          window.CardanoWebQrScanner.stopCamera();
+        });
+      },
+
+      stopCamera: function() {
+        var modal = document.getElementById("qr-scanner-modal");
+        if (modal) modal.style.display = "none";
+
+        if (window.CardanoWebQrScanner.html5QrCode) {
+          try {
+            window.CardanoWebQrScanner.html5QrCode.stop().then(function() {
+              console.log("Camera stopped cleanly");
+            }).catch(function(e) {
+              console.warn("Camera stop error:", e);
+            });
+          } catch(e) {}
+        }
+      },
+
+      pickAndScanImage: function() {
+        var fileInput = document.getElementById("qr-file-picker");
+        if (!fileInput) {
+          fileInput = document.createElement("input");
+          fileInput.type = "file";
+          fileInput.id = "qr-file-picker";
+          fileInput.accept = "image/*";
+          fileInput.style.display = "none";
+          document.body.appendChild(fileInput);
+        }
+
+        fileInput.onchange = function(e) {
+          if (!e.target.files || e.target.files.length === 0) return;
+          var file = e.target.files[0];
+
+          var hiddenScanner = new Html5Qrcode("qr-hidden-reader");
+          hiddenScanner.scanFile(file, true)
+            .then(function(decodedText) {
+              if (window.onCardanoQrScanned) {
+                window.onCardanoQrScanned(decodedText);
+              }
+              hiddenScanner.clear();
+            })
+            .catch(function(err) {
+              alert("Không tìm thấy mã QR hợp lệ trong bức ảnh được chọn.\nChi tiết: " + err);
+              hiddenScanner.clear();
+            });
+          fileInput.value = "";
+        };
+
+        fileInput.click();
+      }
+    };
+
+    // Close camera on Escape key
+    window.addEventListener("keydown", function(e) {
+      if (e.key === "Escape") {
+        window.CardanoWebQrScanner.stopCamera();
+      }
+    });
+  </script>
+</head>
+<body>
+  <!-- Modal Quét Live Camera Web -->
+  <div id="qr-scanner-modal">
+    <div class="qr-modal-header">
+      <div class="qr-modal-title">
+        <span>📷 Quét Mã QR (Air-Gap Scanner)</span>
+      </div>
+      <button class="qr-modal-btn-close" onclick="window.CardanoWebQrScanner.stopCamera()">✕ Đóng</button>
+    </div>
+    <div id="qr-reader-container">
+      <div id="qr-reader"></div>
+    </div>
+    <div class="qr-modal-tip">
+      Hướng camera về phía màn hình Ví Lạnh.<br>Hệ thống tự động tiếp nhận mã QR tĩnh hoặc QR động nhiều mảnh (Multipart UR).
+    </div>
+  </div>
+
+  <!-- Container ẩn phục vụ scan file ảnh -->
+  <div id="qr-hidden-reader"></div>
+
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

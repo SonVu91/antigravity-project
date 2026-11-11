@@ -1,0 +1,49 @@
+# ==============================================================================
+# Antigravity Monorepo .gitignore
+# ==============================================================================
+
+# OS & IDE temporary files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.tmp
+*.bak
+*.swp
+*.log
+
+# Sensitive secrets & credentials - NEVER commit to GitHub
+**/wallets/
+**/wallets*
+**/*secret*
+**/*seed*
+*.skey
+*.xprv
+*.coldbackup
+**/*.coldbackup
+**/config.env
+!**/*.env.example
+
+# Temporary Cardano transaction artifacts
+**/*.draft
+**/*.raw
+**/*.signed
+**/pparams.json
+
+# Flutter & Dart artifacts
+**/.dart_tool/
+**/.packages
+**/build/
+*.aab
+
+# Rust build artifacts
+**/target/
+*.pdb
+
+# Local release staging
+**/releases/
+
+# Allow distributed build outputs and APKs
+!**/output/
+!**/output/**
+!*.apk

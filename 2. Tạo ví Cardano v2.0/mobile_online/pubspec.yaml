@@ -1,0 +1,27 @@
+name: mobile_online
+description: "Cardano Hot Watch-Only Wallet v2.0.5"
+publish_to: 'none'
+version: 2.0.5+6
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cardano_airgap_bridge:
+    path: ../cardano_airgap_bridge
+  flutter_riverpod: ^2.5.1
+  convert: ^3.1.2
+  qr_flutter: ^4.1.0
+  http: ^1.2.2
+  shared_preferences: ^2.2.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

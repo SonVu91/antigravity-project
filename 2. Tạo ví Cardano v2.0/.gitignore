@@ -1,0 +1,58 @@
+# Git ignore for Cardano Air-Gapped Multi-Platform Wallet System v2.0.0
+
+# Rust build artifacts
+rust_cardano_core/target/
+**/target/
+**/*.rs.bk
+*.dll
+*.so
+*.dylib
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+**/build/
+**/.dart_tool/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Android
+.gradle
+local.properties
+**/android/.gradle
+**/android/captures/
+**/android/local.properties
+
+# Secrets & Wallets (CRITICAL SECURITY INVARIANTS)
+*.skey
+*.vkey
+root.xprv
+root.xpub
+wallets/
+**/wallets/
+config.env
+*.env
+!config.env.example
+!.env.example
+*.coldbackup
+**/*.coldbackup
+
+# Tools
+scripts/platform-tools/
+*.zip
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Cho phép thư mục output chứa bản phát hành v2.0.0
+!output/
+!output/**

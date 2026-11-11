@@ -1,0 +1,3 @@
+﻿203ebc889323fce0e33d8bfcd8b4f69e72e416c1e501eeff2fba5b61a716b074  cardano-hot-wallet-v2.0.4-arm64.apk
+2d790ab5a6812ee5088948876fadbbb1583d147e0a9f929307996482abb5532e  cardano-hot-wallet-v2.0.4-armv7.apk
+7c24bedd046c43f98a0e48fb23cca4164da0ea9d2a6462451fd44105aee737c6  cardano-hot-wallet-v2.0.4-universal.apk

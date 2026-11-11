@@ -1,0 +1,6 @@
+2af562a4f36bfd68f796d082c6b7d6daa23f8a252a40facd020fc9c4a4d0e60e  cardano-cold-wallet-v2.0.3-arm64.apk
+641a00270fbdde1c0ac804b5b408a62434a27fb4a3dbdec17e0eb3a6c7ce538f  cardano-cold-wallet-v2.0.3-armv7.apk
+8f39df5f9bd5e58d10b41b7bf408f34ba2f9a5da84bd7c5bf3aa7f1155713c9a  cardano-cold-wallet-v2.0.3-universal.apk
+d7d097918264c512c888b123f582c4c2739c8123fafdc7380d554d0bec63693c  cardano-hot-wallet-v2.0.3-arm64.apk
+f9c1d53ecf95a8a96c723a18b6551d9d5fade17a9508ac62b10136dfe7f79450  cardano-hot-wallet-v2.0.3-armv7.apk
+b5c87911acf924080e1cf34fb5047cba1b7d9bfdf60e2a51accb1b2bb90b3ef1  cardano-hot-wallet-v2.0.3-universal.apk

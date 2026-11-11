@@ -1,0 +1,22 @@
+[package]
+name = "rust_cardano_core"
+version = "2.0.0"
+edition = "2021"
+description = "Native Cardano Cryptography Core with C-FFI, FIPS 140-3 self-verification, Conway CBOR parsing, and Strict Change Guard"
+authors = ["Cardano Air-Gap Team"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+cardano-multiplatform-lib = "6.2.0"
+cml-chain = "6.2.0"
+cml-crypto = "6.2.0"
+cml-core = "6.2.0"
+bip39 = "2.1"
+zeroize = { version = "1.8", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+hex = "0.4"
+thiserror = "1.0"
+getrandom = "0.2"

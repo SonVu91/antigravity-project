@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cardano Air-Gap Dual-Wallet — Unified Simulator Workbench</title>
+  <style>
+    :root {
+      --bg-dark: #0b1120;
+      --card-bg: #151f32;
+      --cold-blue: #0284c7;
+      --cold-border: #38bdf8;
+      --hot-red: #d97706;
+      --hot-border: #f59e0b;
+      --accent: #10b981;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Top App Bar */
+    header {
+      background: #090d16;
+      border-bottom: 1px solid #334155;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      font-size: 24px;
+    }
+
+    .brand-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .brand-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .status-badges {
+      display: flex;
+      gap: 12px;
+    }
+
+    .badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #1e293b;
+      border: 1px solid #334155;
+    }
+
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .dot-green { background: #10b981; box-shadow: 0 0 6px #10b981; }
+    .dot-blue { background: #38bdf8; box-shadow: 0 0 6px #38bdf8; }
+    .dot-red { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
+
+    /* Main Container */
+    .workbench {
+      flex: 1;
+      display: flex;
+      padding: 16px;
+      gap: 16px;
+      overflow: hidden;
+    }
+
+    /* Device Wrapper */
+    .device-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--card-bg);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      border: 2px solid transparent;
+      transition: border-color 0.2s ease;
+    }
+
+    .cold-panel {
+      border-color: var(--cold-blue);
+    }
+
+    .hot-panel {
+      border-color: var(--hot-red);
+    }
+
+    .panel-header {
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #334155;
+    }
+
+    .cold-header {
+      background: linear-gradient(90deg, #0369a1 0%, #0c4a6e 100%);
+    }
+
+    .hot-header {
+      background: linear-gradient(90deg, #b45309 0%, #78350f 100%);
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-icon {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: background 0.15s;
+    }
+
+    .btn-icon:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    .iframe-container {
+      flex: 1;
+      position: relative;
+      background: #000;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    /* Center Air-Gap Optical Bridge */
+    .airgap-channel {
+      width: 220px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 12px;
+      background: #090d16;
+      border-radius: 16px;
+      border: 1px dashed #475569;
+      flex-shrink: 0;
+    }
+
+    .airgap-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #94a3b8;
+      text-align: center;
+    }
+
+    .optical-beam {
+      width: 4px;
+      height: 80px;
+      background: linear-gradient(180deg, #f59e0b 0%, #38bdf8 100%);
+      border-radius: 2px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .optical-beam::after {
+      content: '';
+      position: absolute;
+      top: -100%;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: white;
+      animation: beam 1.5s infinite linear;
+    }
+
+    @keyframes beam {
+      0% { top: -100%; }
+      100% { top: 100%; }
+    }
+
+    .protocol-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 10px;
+      width: 100%;
+      font-size: 11px;
+    }
+
+    .protocol-card h4 {
+      font-size: 11px;
+      color: #38bdf8;
+      margin-bottom: 6px;
+    }
+
+    .clipboard-tool {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .clipboard-tool textarea {
+      width: 100%;
+      height: 60px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      color: #a5f3fc;
+      font-family: monospace;
+      font-size: 10px;
+      padding: 6px;
+      resize: none;
+    }
+
+    .btn-action {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: background 0.15s;
+    }
+
+    .btn-action:hover {
+      background: #1d4ed8;
+    }
+
+    .btn-attack {
+      background: #dc2626;
+    }
+
+    .btn-attack:hover {
+      background: #b91c1c;
+    }
+
+    /* Bottom Test Help Drawer */
+    footer {
+      background: #090d16;
+      border-top: 1px solid #334155;
+      padding: 8px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .guide-steps {
+      display: flex;
+      gap: 16px;
+    }
+
+    .step-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .step-num {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #334155;
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">🛡️</div>
+      <div>
+        <div class="brand-title">Cardano Air-Gap Dual-Wallet Interactive Simulator</div>
+        <div class="brand-subtitle">CIP-1852 HD Derivation • Conway CBOR • Strict Change Guard • UR:CARDANO-TX Animated QR</div>
+      </div>
+    </div>
+
+    <div class="status-badges">
+      <div class="badge">
+        <div class="badge-dot dot-green"></div>
+        <span>Rust CML 6.2.0 Core (:5050)</span>
+      </div>
+      <div class="badge">
+        <div class="badge-dot dot-blue"></div>
+        <span>Cold Wallet (:8081)</span>
+      </div>
+      <div class="badge">
+        <div class="badge-dot dot-red"></div>
+        <span>Hot Wallet (:8082)</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Side-by-Side Dual Wallet Workbench -->
+  <div class="workbench">
+
+    <!-- Left Panel: Cold Wallet -->
+    <div class="device-panel cold-panel">
+      <div class="panel-header cold-header">
+        <div class="panel-title">
+          <span>🔒</span>
+          <span>COLD WALLET (Offline Air-Gap)</span>
+        </div>
+        <div class="panel-controls">
+          <button class="btn-icon" onclick="reloadFrame('coldFrame')">🔄 Tải lại</button>
+          <button class="btn-icon" onclick="openIndependentTab(8081)">↗️ Mở tab riêng</button>
+        </div>
+      </div>
+      <div class="iframe-container">
+        <iframe id="coldFrame" src="about:blank" allow="camera; clipboard-read; clipboard-write"></iframe>
+      </div>
+    </div>
+
+    <!-- Center Air-Gap Optical Channel -->
+    <div class="airgap-channel">
+      <div class="airgap-title">Optical Air-Gap Channel</div>
+      
+      <div class="optical-beam"></div>
+
+      <div class="protocol-card">
+        <h4>Giao thức Animated QR</h4>
+        <p style="color: #cbd5e1; font-size: 10px;">UR:CARDANO-TX</p>
+        <p style="color: #64748b; font-size: 9px; margin-top: 4px;">6 FPS • 180 chars/chunk • Không Wi-Fi/Bluetooth</p>
+      </div>
+
+      <div class="clipboard-tool">
+        <label style="font-size: 10px; color: #94a3b8; font-weight: 600;">Dữ liệu chuyển đổi (Bridge):</label>
+        <textarea id="bridgeData" placeholder="txRaw / txSigned / Address sẽ hiển thị ở đây..."></textarea>
+        <button class="btn-action" onclick="copyBridgeData()">📋 Sao chép dữ liệu</button>
+        <button class="btn-action" style="background: #10b981; color: white;" onclick="injectWithdrawalTx()">🎁 Nạp txRaw Mẫu Rút Thưởng Staking (15.8 ADA)</button>
+        <button class="btn-action" style="background: #8b5cf6; color: white;" onclick="injectDelegationTx()">🗳️ Nạp txRaw Mẫu Ủy Thác FIMI (Pool & DRep)</button>
+        <button class="btn-action" style="background: #0284c7; color: white;" onclick="injectTokenTx()">💎 Nạp txRaw Mẫu Gửi Token (HOSKY & SNEK)</button>
+        <button class="btn-action btn-attack" onclick="injectAttackTx()">⚠️ Nạp txRaw Tấn Công (Đổi tiền thối)</button>
+      </div>
+
+      <div class="protocol-card" style="border-color: #3b82f6;">
+        <h4 style="color: #60a5fa;">Mẹo kiểm định:</h4>
+        <p style="font-size: 9px; color: #94a3b8;">
+          Sau khi Cold tạo ví, dán địa chỉ ví sang ô Hot. Khi Hot tạo txRaw, dán vào Cold để xem <b>Strict Change Guard</b> phê duyệt!
+        </p>
+      </div>
+    </div>
+
+    <!-- Right Panel: Hot Wallet -->
+    <div class="device-panel hot-panel">
+      <div class="panel-header hot-header">
+        <div class="panel-title">
+          <span>📡</span>
+          <span>HOT WALLET (Watch-Only Online)</span>
+        </div>
+        <div class="panel-controls">
+          <button class="btn-icon" onclick="reloadFrame('hotFrame')">🔄 Tải lại</button>
+          <button class="btn-icon" onclick="openIndependentTab(8082)">↗️ Mở tab riêng</button>
+        </div>
+      </div>
+      <div class="iframe-container">
+        <iframe id="hotFrame" src="about:blank" allow="camera; clipboard-read; clipboard-write"></iframe>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer Guide -->
+  <footer>
+    <div class="guide-steps">
+      <div class="step-item">
+        <div class="step-num">1</div>
+        <span>Cold: Tạo ví & sao chép địa chỉ `addr_test1...`</span>
+      </div>
+      <div class="step-item">
+        <div class="step-num">2</div>
+        <span>Hot: Dán địa chỉ để theo dõi số dư Preprod</span>
+      </div>
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <span>Hot: Soạn chuyển tiền ➔ Xuất txRaw Animated QR</span>
+      </div>
+      <div class="step-item">
+        <div class="step-num">4</div>
+        <span>Cold: Dán txRaw ➔ Change Guard duyệt ➔ Nhập PIN ký</span>
+      </div>
+      <div class="step-item">
+        <div class="step-num">5</div>
+        <span>Hot: Nhận txSigned ➔ Nộp Blockfrost</span>
+      </div>
+    </div>
+
+    <div>Cardano Conway Air-Gap System v1.0.0</div>
+  </footer>
+
+  <script>
+    function initFrames() {
+      const host = window.location.hostname || 'localhost';
+      document.getElementById('coldFrame').src = 'http://' + host + ':8081';
+      document.getElementById('hotFrame').src = 'http://' + host + ':8082';
+    }
+    window.addEventListener('DOMContentLoaded', initFrames);
+
+    function openIndependentTab(port) {
+      const host = window.location.hostname || 'localhost';
+      window.open('http://' + host + ':' + port, '_blank');
+    }
+
+    function reloadFrame(frameId) {
+      const frame = document.getElementById(frameId);
+      if (frame) {
+        frame.src = frame.src;
+      }
+    }
+
+    function copyBridgeData() {
+      const el = document.getElementById('bridgeData');
+      el.select();
+      navigator.clipboard.writeText(el.value).then(() => {
+        alert("Đã sao chép vào bộ nhớ đệm (Clipboard)!");
+      }).catch(() => {
+        document.execCommand('copy');
+        alert("Đã sao chép!");
+      });
+    }
+
+    // Nạp giao dịch Rút Thưởng Staking mẫu (15.8 ADA)
+    function injectWithdrawalTx() {
+      const withdrawalTxRaw = "TxBodyConwayWithdrawal:a50081825820a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef00001818258390033eff4f12fadfbee9a44c027a8adef8b2409552a459defd25739582d4dc1f2bca2dd7748c0a4faf32f02c5be7a250435c3f9ceb26ec038741a0186b388021a0002f9b8031a042c1d8005a1581de00793d52507a1497bb5e46e52a805ba925eea913900000000000000001a00f116c0";
+      const bridgeEl = document.getElementById('bridgeData');
+      bridgeEl.value = withdrawalTxRaw;
+      navigator.clipboard.writeText(withdrawalTxRaw);
+      alert("🎁 Đã nạp giao dịch Rút Thưởng Staking (15.8 ADA, Phí tự tính ~0.195 ADA) vào Clipboard!\n\nHãy sang Cold Wallet và chọn 'Dán txRaw thủ công'. Màn hình Cold Wallet sẽ nhận diện giao dịch rút thưởng và tự động kích hoạt chế độ Ký Kép (Payment Key + Stake Key) an toàn!");
+    }
+
+    // Nạp giao dịch Ủy Thác FIMI mẫu (Stake Pool FIMI + DRep FIMI)
+    function injectDelegationTx() {
+      const delegTxRaw = "TxBodyConwayDelegation:a50081825820a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef00001818258390033eff4f12fadfbee9a44c027a8adef8b2409552a459defd25739582d4dc1f2bca2dd7748c0a4faf32f02c5be7a250435c3f9ceb26ec038741a02faf688021a0002f9b8031a042c1d800481840a8200581c4dc1f2bca2dd7748c0a4faf32f02c5be7a250435c3f9ceb26ec03874581cabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef008200581c98765432109876543210987654321098765432109876543210987654";
+      const bridgeEl = document.getElementById('bridgeData');
+      bridgeEl.value = delegTxRaw;
+      navigator.clipboard.writeText(delegTxRaw);
+      alert("🗳️ Đã nạp giao dịch Ủy Thác FIMI (Pool FIMI + DRep FIMI, Phí ~0.195 ADA) vào Clipboard!\n\nHãy sang Cold Wallet và chọn 'Dán txRaw thủ công'. Màn hình Cold Wallet sẽ nhận diện giao dịch ủy thác Conway và tự động kích hoạt chế độ Ký Kép (Payment Key + Stake Key) an toàn!");
+    }
+
+    // Nạp giao dịch Multi-Asset mẫu gửi 300,000 HOSKY & 20,000 SNEK
+    function injectTokenTx() {
+      const tokenTxRaw = "TxBodyConway:a40081825820a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0000182825839009493315cd92eb5d8c4304e67b7e16ae36d61d34502694657811a2c8e2198b7029b682a7bd8208b000717a1efa511e86a36fff09645d4d314821a0013d620a2581ca0028f350aaabe0545fdcb56b039dbb01871b6330ebe111f2dc26960a145484f534b591a000493e0581c279c909f348e533da5808898f87f9a14bb2c3dfbbacccd631d927a3fa144534e454b194e208258390033eff4f12fadfbee9a44c027a8adef8b2409552a459defd25739582d4dc1f2bca2dd7748c0a4faf32f02c5be7a250435c3f9ceb26ec03874821a02e3bf00a2581ca0028f350aaabe0545fdcb56b039dbb01871b6330ebe111f2dc26960a145484f534b591a000aae60581c279c909f348e533da5808898f87f9a14bb2c3dfbbacccd631d927a3fa144534e454b197530021a00035b60031a042c1d80";
+      const bridgeEl = document.getElementById('bridgeData');
+      bridgeEl.value = tokenTxRaw;
+      navigator.clipboard.writeText(tokenTxRaw);
+      alert("💎 Đã nạp giao dịch gửi Native Tokens (300,000 HOSKY & 20,000 SNEK) vào Clipboard!\n\nHãy sang Cold Wallet và chọn 'Dán txRaw thủ công'. Màn hình Tx Inspector sẽ bóc tách và hiển thị chi tiết tên Token, số lượng và Min-ADA đính kèm!");
+    }
+
+    // Kịch bản tấn công: Kẻ tấn công trỏ tiền thừa về địa chỉ lạ
+    function injectAttackTx() {
+      const attackerTxRaw = "TxBodyConway:a40081825820a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a10001828258390033eff4f12fadfbee9a44c027a8adef8b2409552a459defd25739582d4dc1f2bca2dd7748c0a4faf32f02c5be7a250435c3f9ceb26ec038741a009896808258390015cda6ba2f35ec82d52d21d4ecddb531796e51e4b21284e234c060cc9e5ed7e8bdc33cc76bbf62aff0364bd3770fb51d5f06a39239fd9cae1a01312d00021a0002bf20031a043c52a0";
+      const bridgeEl = document.getElementById('bridgeData');
+      bridgeEl.value = attackerTxRaw;
+      navigator.clipboard.writeText(attackerTxRaw);
+      alert("⚠️ Đã nạp giao dịch THAY ĐỔI TIỀN THỐI (Hijacked Change Address) vào Clipboard!\n\nHãy sang Cold Wallet và chọn 'Dán txRaw thủ công'. Strict Change Guard sẽ lập tức bật cảnh báo màu ĐỎ và KHÓA nút Ký!");
+    }
+  </script>
+</body>
+</html>

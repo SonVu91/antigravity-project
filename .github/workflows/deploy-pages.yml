@@ -1,0 +1,50 @@
+name: Deploy Cardano Web Hot Wallet to GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "2. Tạo ví Cardano v2.0/mobile_online/**"
+      - "2. Tạo ví Cardano v2.0/cardano_airgap_bridge/**"
+      - "2. Tạo ví Cardano v2.0/output/web_hot_wallet/**"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: 'stable'
+          cache: true
+
+      - name: Build Flutter Web Hot Wallet
+        run: |
+          TARGET_DIR="2. Tạo ví Cardano v2.0"
+          echo "Building Web Hot Wallet in: $TARGET_DIR/mobile_online"
+          cd "$TARGET_DIR/mobile_online"
+          flutter pub get
+          flutter build web --release --base-href "/antigravity-project/"
+          cd ../..
+          mkdir -p "$TARGET_DIR/output/web_hot_wallet"
+          cp -rf "$TARGET_DIR/mobile_online/build/web/"* "$TARGET_DIR/output/web_hot_wallet/"
+
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: "2. Tạo ví Cardano v2.0/output/web_hot_wallet"
+          enable_jekyll: false

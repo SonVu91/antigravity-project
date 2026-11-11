@@ -3,11 +3,6 @@ name: Deploy Cardano Web Hot Wallet to GitHub Pages
 on:
   push:
     branches: ["main"]
-    paths:
-      - "2. Tạo ví Cardano v2.0/mobile_online/**"
-      - "2. Tạo ví Cardano v2.0/cardano_airgap_bridge/**"
-      - "2. Tạo ví Cardano v2.0/output/web_hot_wallet/**"
-      - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
 
 permissions:

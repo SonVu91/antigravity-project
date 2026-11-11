@@ -21,7 +21,7 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="description" content="Cardano Hot Watch-Only Wallet (Air-Gap Edition) - Safe offline monitoring and transaction broadcasting for Cardano.">
+  <meta name="description" content="Cardano Hot Watch-Only Wallet v2.0.5 (Air-Gap Edition) - Safe offline monitoring and transaction broadcasting for Cardano.">
 
   <!-- Apple iOS PWA Meta Tags -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -127,6 +127,42 @@
       border-color: #ff334b;
     }
 
+    #qr-progress-box {
+      display: none;
+      width: 100%;
+      max-width: 440px;
+      margin-top: 12px;
+      background: #181c24;
+      border: 1px solid rgba(255, 107, 0, 0.5);
+      border-radius: 10px;
+      padding: 10px 14px;
+      box-sizing: border-box;
+      color: #ffffff;
+      font-size: 13px;
+    }
+
+    .qr-progress-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .qr-progress-bar-bg {
+      width: 100%;
+      height: 8px;
+      background: #2a2e39;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    #qr-progress-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: #ff6b00;
+      transition: width 0.2s ease;
+    }
+
     .qr-modal-tip {
       width: 100%;
       max-width: 440px;
@@ -136,15 +172,9 @@
       text-align: center;
       line-height: 1.4;
     }
-
-    /* Container vô hình để decode ảnh file */
-    #qr-hidden-reader {
-      display: none;
-    }
   </style>
 
   <script>
-    // Global QR Scanner Controller for Cardano Web Hot Wallet
     window.CardanoWebQrScanner = {
       html5QrCode: null,
       isScanning: false,
@@ -152,6 +182,8 @@
       startCamera: function() {
         var modal = document.getElementById("qr-scanner-modal");
         if (modal) modal.style.display = "flex";
+        var pBox = document.getElementById("qr-progress-box");
+        if (pBox) pBox.style.display = "none";
 
         if (!window.CardanoWebQrScanner.html5QrCode) {
           window.CardanoWebQrScanner.html5QrCode = new Html5Qrcode("qr-reader");
@@ -174,14 +206,11 @@
           { facingMode: "environment" },
           config,
           function(decodedText, decodedResult) {
-            // Success Callback per frame / QR detection
             if (window.onCardanoQrScanned) {
               window.onCardanoQrScanned(decodedText);
             }
           },
-          function(errorMessage) {
-            // Ignore scan parse error per frame
-          }
+          function(errorMessage) {}
         ).catch(function(err) {
           console.error("Camera start error:", err);
           alert("Không thể khởi động Camera: " + err + "\n\nLưu ý: iOS Safari và Chrome yêu cầu mở trang web qua HTTPS hoặc localhost để cấp quyền truy cập Camera.");
@@ -189,9 +218,23 @@
         });
       },
 
+      updateProgress: function(received, total) {
+        var pBox = document.getElementById("qr-progress-box");
+        var pText = document.getElementById("qr-progress-text");
+        var pFill = document.getElementById("qr-progress-bar-fill");
+        if (pBox && total > 1) {
+          pBox.style.display = "block";
+          var pct = Math.min(100, Math.round((received * 100) / total));
+          if (pText) pText.innerText = received + " / " + total + " mảnh (" + pct + "%)";
+          if (pFill) pFill.style.width = pct + "%";
+        }
+      },
+
       stopCamera: function() {
         var modal = document.getElementById("qr-scanner-modal");
         if (modal) modal.style.display = "none";
+        var pBox = document.getElementById("qr-progress-box");
+        if (pBox) pBox.style.display = "none";
 
         if (window.CardanoWebQrScanner.html5QrCode) {
           try {
@@ -202,43 +245,9 @@
             });
           } catch(e) {}
         }
-      },
-
-      pickAndScanImage: function() {
-        var fileInput = document.getElementById("qr-file-picker");
-        if (!fileInput) {
-          fileInput = document.createElement("input");
-          fileInput.type = "file";
-          fileInput.id = "qr-file-picker";
-          fileInput.accept = "image/*";
-          fileInput.style.display = "none";
-          document.body.appendChild(fileInput);
-        }
-
-        fileInput.onchange = function(e) {
-          if (!e.target.files || e.target.files.length === 0) return;
-          var file = e.target.files[0];
-
-          var hiddenScanner = new Html5Qrcode("qr-hidden-reader");
-          hiddenScanner.scanFile(file, true)
-            .then(function(decodedText) {
-              if (window.onCardanoQrScanned) {
-                window.onCardanoQrScanned(decodedText);
-              }
-              hiddenScanner.clear();
-            })
-            .catch(function(err) {
-              alert("Không tìm thấy mã QR hợp lệ trong bức ảnh được chọn.\nChi tiết: " + err);
-              hiddenScanner.clear();
-            });
-          fileInput.value = "";
-        };
-
-        fileInput.click();
       }
     };
 
-    // Close camera on Escape key
     window.addEventListener("keydown", function(e) {
       if (e.key === "Escape") {
         window.CardanoWebQrScanner.stopCamera();
@@ -258,13 +267,19 @@
     <div id="qr-reader-container">
       <div id="qr-reader"></div>
     </div>
+    <div id="qr-progress-box">
+      <div class="qr-progress-row">
+        <span>Tiến độ quét QR Động:</span>
+        <span id="qr-progress-text" style="color: #ff6b00;">0 / 0 mảnh (0%)</span>
+      </div>
+      <div class="qr-progress-bar-bg">
+        <div id="qr-progress-bar-fill"></div>
+      </div>
+    </div>
     <div class="qr-modal-tip">
       Hướng camera về phía màn hình Ví Lạnh.<br>Hệ thống tự động tiếp nhận mã QR tĩnh hoặc QR động nhiều mảnh (Multipart UR).
     </div>
   </div>
-
-  <!-- Container ẩn phục vụ scan file ảnh -->
-  <div id="qr-hidden-reader"></div>
 
   <script src="flutter_bootstrap.js" async></script>
 </body>

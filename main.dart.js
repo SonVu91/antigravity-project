@@ -86324,7 +86324,7 @@ break
 case 5:s=7
 return A.C(a3.es("Int","hot_schema_version",3),$async$fC)
 case 7:s=8
-return A.C(a3.es("String","hot_app_version","1.2.0"),$async$fC)
+return A.C(a3.es("String","hot_app_version","2.0.4"),$async$fC)
 case 8:q=!0
 s=1
 break
@@ -86364,7 +86364,7 @@ return A.C(a3.es("String","hot_watched_wallets_v3",A.aGy(j)),$async$fC)
 case 28:case 27:case 25:s=29
 return A.C(a3.es("Int","hot_schema_version",3),$async$fC)
 case 29:s=30
-return A.C(a3.es("String","hot_app_version","1.2.0"),$async$fC)
+return A.C(a3.es("String","hot_app_version","2.0.4"),$async$fC)
 case 30:s=31
 return A.C(a3.es("String","hot_updated_at",new A.dj(Date.now(),0,!1).qN()),$async$fC)
 case 31:q=!0
@@ -86564,7 +86564,7 @@ if(k==null)k=A.a([],t.lD)
 o=A.A(t.N,t.z)
 o.n(0,"magic","CARDANO_HOT_BACKUP")
 o.n(0,"schema_version",3)
-o.n(0,"app_version","1.2.0")
+o.n(0,"app_version","2.0.4")
 o.n(0,"timestamp",new A.dj(Date.now(),0,!1).qN())
 o.n(0,"network",t.TL.a(l.h(m,"network")).b)
 o.n(0,"api_key",l.h(m,"apiKey"))

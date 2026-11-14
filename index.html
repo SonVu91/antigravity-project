@@ -293,24 +293,32 @@
         // Vòng đời sạch: Giải phóng an toàn instance cũ nếu có
         await window.CardanoWebQrScanner._cleanExistingScanner();
 
-        // Tạo mới instance scanner
+        // Tạo mới instance scanner với Native BarcodeDetector
         try {
-          window.CardanoWebQrScanner.html5QrCode = new Html5Qrcode("qr-reader");
+          window.CardanoWebQrScanner.html5QrCode = new Html5Qrcode("qr-reader", {
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true
+            },
+            verbose: false
+          });
         } catch (e) {
           console.warn("Could not create Html5Qrcode instance:", e);
         }
 
-        // Cấu hình quét
+        // Cấu hình quét độ nét cao (Full HD / HD) để giải quyết QR có logo hoặc mật độ dày
         var config = {
-          fps: 25,
+          fps: 30,
           qrbox: function(viewfinderWidth, viewfinderHeight) {
             var minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            var boxSize = Math.floor(minEdge * 0.78);
+            var boxSize = Math.floor(minEdge * 0.88);
             return { width: boxSize, height: boxSize };
           },
           aspectRatio: 1.0,
           videoConstraints: {
-            facingMode: { ideal: "environment" }
+            facingMode: { ideal: "environment" },
+            width: { min: 1280, ideal: 1920 },
+            height: { min: 720, ideal: 1080 },
+            focusMode: { ideal: "continuous" }
           }
         };
 
@@ -452,20 +460,64 @@
 
         await window.CardanoWebQrScanner._cleanExistingScanner();
         try {
-          window.CardanoWebQrScanner.html5QrCode = new Html5Qrcode("qr-reader");
+          window.CardanoWebQrScanner.html5QrCode = new Html5Qrcode("qr-reader", {
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true
+            },
+            verbose: false
+          });
           var config = {
-            fps: 25,
+            fps: 30,
             qrbox: function(w, h) {
               var minEdge = Math.min(w, h);
-              var boxSize = Math.floor(minEdge * 0.78);
+              var boxSize = Math.floor(minEdge * 0.88);
               return { width: boxSize, height: boxSize };
             },
-            aspectRatio: 1.0
+            aspectRatio: 1.0,
+            videoConstraints: {
+              width: { min: 1280, ideal: 1920 },
+              height: { min: 720, ideal: 1080 },
+              focusMode: { ideal: "continuous" }
+            }
           };
           await window.CardanoWebQrScanner._attemptStart(nextCamId, config);
         } catch (e) {
           console.error("Switch camera error:", e);
           window.CardanoWebQrScanner._showErrorUI(e);
+        }
+      },
+
+      scanImageFile: async function(file) {
+        if (!file) return;
+        var loading = document.getElementById("qr-loading-overlay");
+        if (loading) {
+          loading.style.display = "flex";
+          var txt = loading.querySelector("div:last-child");
+          if (txt) txt.innerText = "Đang quét mã QR từ hình ảnh...";
+        }
+
+        try {
+          var sc = window.CardanoWebQrScanner.html5QrCode;
+          if (!sc) {
+            sc = new Html5Qrcode("qr-reader", {
+              experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+            });
+            window.CardanoWebQrScanner.html5QrCode = sc;
+          }
+          var decodedText = await sc.scanFile(file, true);
+          if (loading) loading.style.display = "none";
+          if (navigator.vibrate) {
+            try { navigator.vibrate(60); } catch(v) {}
+          }
+          if (window.onCardanoQrScanned) {
+            window.onCardanoQrScanned(decodedText);
+          }
+        } catch (err) {
+          if (loading) loading.style.display = "none";
+          alert("Không phát hiện mã QR hợp lệ trong ảnh: " + (err || "Vui lòng chọn ảnh chụp rõ nét hơn."));
+        } finally {
+          var inp = document.getElementById("qr-file-input");
+          if (inp) inp.value = "";
         }
       },
 
@@ -523,6 +575,10 @@
         <span>📷 Quét Mã QR (Air-Gap Scanner)</span>
       </div>
       <div class="qr-header-actions">
+        <input type="file" id="qr-file-input" accept="image/*" style="display: none;" onchange="window.CardanoWebQrScanner.scanImageFile(this.files[0])">
+        <button class="qr-modal-btn-action" onclick="document.getElementById('qr-file-input').click()" title="Tải ảnh QR từ thư viện máy">
+          <span>🖼️</span> Tải Ảnh
+        </button>
         <button class="qr-modal-btn-action" onclick="window.CardanoWebQrScanner.switchCamera()" title="Đổi camera trước / sau">
           <span>🔄</span> Đổi Cam
         </button>
@@ -564,7 +620,7 @@
       </div>
     </div>
     <div class="qr-modal-tip">
-      Hướng camera về phía màn hình Ví Lạnh.<br>Hệ thống tự động tiếp nhận mã QR tĩnh hoặc QR động nhiều mảnh (Multipart QR).
+      Hướng camera về phía mã QR (giữ khoảng cách 15-20cm để lấy nét rõ).<br>Hỗ trợ QR tĩnh, QR có logo và QR động nhiều mảnh (UR). Nếu quét màn hình bị chói, bạn có thể nhấn <b>Tải Ảnh</b> để chọn ảnh chụp màn hình.
     </div>
   </div>
 

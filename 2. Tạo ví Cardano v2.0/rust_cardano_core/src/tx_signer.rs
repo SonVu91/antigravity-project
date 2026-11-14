@@ -178,11 +178,20 @@ impl TransactionSigner {
         // Chốt chặn bảo vệ Change Guard chống Ký Mù / Đánh Tráo Tiền Thừa (Anti-Change Hijacking Guard):
         let account_xpub = account.to_public();
 
-        // Áp dụng nguyên tắc Fail-Closed: Bắt buộc parse_raw_cbor thành công và is_change_safe = true
-        let parsed = crate::tx_parser::TransactionParser::parse_raw_cbor(
+        let payment_key = KeyDerivator::derive_payment_key(&account, address_index)?;
+        let stake_key_temp = KeyDerivator::derive_stake_key(&account, 0)?;
+        let expected_payment_addr = KeyDerivator::build_base_address(
+            &payment_key.to_public(),
+            &stake_key_temp.to_public(),
+            is_testnet,
+        ).ok();
+
+        // Áp dụng nguyên tắc Fail-Closed: Bắt buộc parse_raw_cbor_dynamic thành công và is_change_safe = true
+        let parsed = crate::tx_parser::TransactionParser::parse_raw_cbor_dynamic(
             cbor_hex,
             Some(&account_xpub.to_raw_hex()),
             is_testnet,
+            expected_payment_addr.as_deref(),
         ).map_err(|e| format!("SECURITY_REJECTED_PARSER_ERROR: Không thể phân tích giao dịch để kiểm định an toàn: {}", e))?;
 
         if !parsed.is_change_safe {
@@ -192,7 +201,6 @@ impl TransactionSigner {
             return Err(format!("SECURITY_BLOCKED_BY_CHANGE_GUARD: {}", warning));
         }
 
-        let payment_key = KeyDerivator::derive_payment_key(&account, address_index)?;
         let raw_payment_private = payment_key.to_raw_key();
         let raw_payment_public = payment_key.to_public().to_raw_key();
 

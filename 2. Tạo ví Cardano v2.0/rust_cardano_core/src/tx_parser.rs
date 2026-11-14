@@ -60,6 +60,15 @@ impl TransactionParser {
         account_xpub_hex: Option<&str>,
         is_testnet: bool,
     ) -> Result<ParsedTransaction, String> {
+        Self::parse_raw_cbor_dynamic(cbor_hex, account_xpub_hex, is_testnet, None)
+    }
+
+    pub fn parse_raw_cbor_dynamic(
+        cbor_hex: &str,
+        account_xpub_hex: Option<&str>,
+        is_testnet: bool,
+        known_active_address: Option<&str>,
+    ) -> Result<ParsedTransaction, String> {
         let trimmed_input = cbor_hex.trim();
         let is_withdrawal_prefix = trimmed_input.starts_with("TxBodyConwayWithdrawal:");
         let is_delegation_prefix = trimmed_input.starts_with("TxBodyConwayDelegation:");
@@ -344,7 +353,7 @@ impl TransactionParser {
             if is_change {
                 change_lovelace = change_lovelace.saturating_add(coin);
                 if let Some(ref xpub) = account_xpub {
-                    match ChangeGuard::verify_change_address(&addr_str, xpub, is_testnet) {
+                    match ChangeGuard::verify_change_address_dynamic(&addr_str, xpub, is_testnet, known_active_address) {
                         Ok(true) => {
                             is_verified = true;
                         }

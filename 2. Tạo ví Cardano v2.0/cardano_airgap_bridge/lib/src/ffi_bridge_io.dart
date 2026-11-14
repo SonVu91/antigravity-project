@@ -21,6 +21,9 @@ typedef _CardanoCreateWalletExtDart = Pointer<Utf8> Function(Pointer<Utf8> phras
 typedef _CardanoParseTxC = Pointer<Utf8> Function(Pointer<Utf8> cborHex, Pointer<Utf8> accountXpubHex, Bool isTestnet);
 typedef _CardanoParseTxDart = Pointer<Utf8> Function(Pointer<Utf8> cborHex, Pointer<Utf8> accountXpubHex, bool isTestnet);
 
+typedef _CardanoParseTxExtC = Pointer<Utf8> Function(Pointer<Utf8> cborHex, Pointer<Utf8> accountXpubHex, Bool isTestnet, Pointer<Utf8> knownActiveAddress);
+typedef _CardanoParseTxExtDart = Pointer<Utf8> Function(Pointer<Utf8> cborHex, Pointer<Utf8> accountXpubHex, bool isTestnet, Pointer<Utf8> knownActiveAddress);
+
 typedef _CardanoSignTxC = Pointer<Utf8> Function(Pointer<Utf8> cborHex, Pointer<Utf8> mnemonic, Pointer<Utf8> passphrase, Bool signStake, Uint32 accountIndex, Uint32 addressIndex);
 typedef _CardanoSignTxDart = Pointer<Utf8> Function(Pointer<Utf8> cborHex, Pointer<Utf8> mnemonic, Pointer<Utf8> passphrase, bool signStake, int accountIndex, int addressIndex);
 
@@ -199,18 +202,40 @@ class CardanoCoreBridge {
     );
   }
 
-  static ParsedTransaction parseTransaction(String cborHex, {String? accountXpubHex, bool isTestnet = true}) {
+  static ParsedTransaction parseTransaction(
+    String cborHex, {
+    String? accountXpubHex,
+    bool isTestnet = true,
+    String? knownAddress,
+  }) {
     init();
     if (_lib != null) {
-      final fn = _lib!.lookupFunction<_CardanoParseTxC, _CardanoParseTxDart>('cardano_core_parse_transaction');
       final freeFn = _lib!.lookupFunction<_CardanoFreeStrC, _CardanoFreeStrDart>('cardano_core_free_string');
       final pCbor = cborHex.toNativeUtf8();
       final pXpub = (accountXpubHex ?? '').toNativeUtf8();
       Pointer<Utf8> ptr = nullptr;
       String jsonStr = '';
+
+      // Thử tìm hàm mở rộng cardano_core_parse_transaction_ext
+      _CardanoParseTxExtDart? fnExt;
       try {
-        ptr = fn(pCbor, pXpub, isTestnet);
-        jsonStr = ptr.toDartString();
+        fnExt = _lib!.lookupFunction<_CardanoParseTxExtC, _CardanoParseTxExtDart>('cardano_core_parse_transaction_ext');
+      } catch (_) {}
+
+      try {
+        if (fnExt != null) {
+          final pKnown = (knownAddress ?? '').toNativeUtf8();
+          try {
+            ptr = fnExt(pCbor, pXpub, isTestnet, pKnown);
+            jsonStr = ptr.toDartString();
+          } finally {
+            _secureFreeUtf8(pKnown);
+          }
+        } else {
+          final fn = _lib!.lookupFunction<_CardanoParseTxC, _CardanoParseTxDart>('cardano_core_parse_transaction');
+          ptr = fn(pCbor, pXpub, isTestnet);
+          jsonStr = ptr.toDartString();
+        }
       } finally {
         if (ptr != nullptr) freeFn(ptr);
         _secureFreeUtf8(pCbor);
@@ -219,7 +244,28 @@ class CardanoCoreBridge {
 
       final map = jsonDecode(jsonStr);
       if (map['success'] == true) {
-        return ParsedTransaction.fromJson(map['data'] as Map<String, dynamic>);
+        var result = ParsedTransaction.fromJson(map['data'] as Map<String, dynamic>);
+
+        // DUAL-LAYER FAST-PATH PROTECTION:
+        // Hỗ trợ mọi Account Index & Address Index lên tới 2.147.483.647 trên mọi phiên bản native .so
+        // Nếu change output trùng khớp với knownAddress của ví đang mở:
+        if (!result.isChangeSafe && knownAddress != null && knownAddress.trim().isNotEmpty) {
+          final cleanKnown = knownAddress.trim();
+          final matchingChangeOutput = result.outputs.any((out) => out.isChange && out.address == cleanKnown);
+          if (matchingChangeOutput) {
+            final cleanedWarnings = (result.securityWarnings)
+                .where((w) => !w.contains("SECURITY_ALERT_CHANGE_HIJACKING") || !w.contains(cleanKnown))
+                .toList();
+            final hasOtherCriticalWarnings = cleanedWarnings.any((w) => w.contains("SECURITY_ALERT_"));
+            result = result.copyWith(
+              isChangeSafe: !hasOtherCriticalWarnings,
+              securityWarning: cleanedWarnings.isNotEmpty ? cleanedWarnings.first : null,
+              securityWarnings: cleanedWarnings,
+            );
+          }
+        }
+
+        return result;
       } else {
         throw Exception(map['error']);
       }

@@ -1,0 +1,4 @@
+﻿b394a44194665469c16a19a4d5a2f063deeb16d8413a27fa8c4c3e9fae4103b3  cardano-cold-wallet-v2.0.5-armv7.apk
+1370fe23789e9a21cbb8d6c3c3bcba323164024c19568944ea3f6b14263e4f01  cardano-cold-wallet-v2.0.5-arm64.apk
+feb5c5666ae8278309981abae9d5fb29b1aabb72a05112f9aac795e6a768f9b1  cardano-cold-wallet-v2.0.5-universal.apk
+feb5c5666ae8278309981abae9d5fb29b1aabb72a05112f9aac795e6a768f9b1  cardano-cold-wallet-v2.0.5.apk

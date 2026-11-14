@@ -67,11 +67,17 @@ class CardanoCoreBridge {
     throw StateError(res['error']?.toString() ?? 'Failed to create wallet: Auxiliary service unreachable.');
   }
 
-  static ParsedTransaction parseTransaction(String cborHex, {String? accountXpubHex, bool isTestnet = true}) {
+  static ParsedTransaction parseTransaction(
+    String cborHex, {
+    String? accountXpubHex,
+    bool isTestnet = true,
+    String? knownAddress,
+  }) {
     final res = _post('/api/parse_tx', {
       'cbor_hex': cborHex,
       'account_xpub_hex': accountXpubHex ?? '',
       'is_testnet': isTestnet,
+      'known_address': knownAddress ?? '',
     });
     if (res['success'] == true && res['data'] != null) {
       return ParsedTransaction.fromJson(res['data'] as Map<String, dynamic>);
@@ -111,11 +117,6 @@ class CardanoCoreBridge {
     });
     if (res['success'] == true && res['data'] != null) {
       return res['data'] as bool;
-    }
-    // Khi chạy trên Web tĩnh không có Auxiliary Service nội bộ (ví dụ GitHub Pages),
-    // không chặn phát sóng mà để node Cardano (Blockfrost) xác thực chữ ký chính thức.
-    if (res['error']?.toString().contains('not reachable') == true) {
-      return true;
     }
     return false;
   }

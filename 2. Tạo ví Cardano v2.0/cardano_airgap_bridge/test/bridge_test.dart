@@ -210,4 +210,69 @@ void main() {
       expect(nextName2, 'Ví Phụ #2');
     });
   });
+
+  group('Hidden Wallet (Passphrase) & High Index Fast-Path Tests', () {
+    test('Create Hidden Wallet with Passphrase and high index (acc 100, addr 500)', () {
+      const phrase = 'test walk nut penalty hip pave soap entry language right filter choice';
+      final hiddenWallet = CardanoCoreBridge.createWallet(
+        phrase,
+        passphrase: 'super_secret_passphrase_j7',
+        isTestnet: true,
+        accountIndex: 100,
+        addressIndex: 500,
+      );
+
+      expect(hiddenWallet.paymentAddress.startsWith('addr_test1'), isTrue);
+      expect(hiddenWallet.accountIndex, 100);
+      expect(hiddenWallet.addressIndex, 500);
+      expect(hiddenWallet.derivationPath, "m/1852'/1815'/100'/0/500");
+
+      // Verify that sample tx change to this high-index address is verified safely via knownAddress (Fast-Path O(1))
+      final sampleTxHex = CardanoCoreBridge.createSampleConwayTx(hiddenWallet.paymentAddress, 2000000, 175000);
+      final parsedWithKnown = CardanoCoreBridge.parseTransaction(
+        sampleTxHex,
+        accountXpubHex: hiddenWallet.accountXpubHex,
+        isTestnet: true,
+        knownAddress: hiddenWallet.paymentAddress,
+      );
+
+      expect(parsedWithKnown.isChangeSafe, isTrue);
+      expect(parsedWithKnown.securityWarnings, isEmpty);
+
+      // Verify signing works seamlessly with passphrase & high index
+      final signedHex = CardanoCoreBridge.signTransaction(
+        sampleTxHex,
+        phrase,
+        passphrase: 'super_secret_passphrase_j7',
+        accountIndex: 100,
+        addressIndex: 500,
+      );
+      expect(signedHex.isNotEmpty, isTrue);
+      expect(CardanoCoreBridge.verifySignedTransaction(signedHex), isTrue);
+    });
+
+    test('Change Guard rejects attacker address', () {
+      const phrase = 'test walk nut penalty hip pave soap entry language right filter choice';
+      final hiddenWallet = CardanoCoreBridge.createWallet(
+        phrase,
+        passphrase: 'super_secret_passphrase_j7',
+        isTestnet: true,
+        accountIndex: 100,
+        addressIndex: 500,
+      );
+
+      final attackerWallet = CardanoCoreBridge.createWallet(
+        'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about',
+        isTestnet: true,
+      );
+
+      // Verify that ChangeGuard rejects attacker address for this hidden wallet
+      final isAttackerChangeSafe = CardanoCoreBridge.verifyChange(
+        attackerWallet.paymentAddress,
+        hiddenWallet.accountXpubHex,
+        isTestnet: true,
+      );
+      expect(isAttackerChangeSafe, isFalse);
+    });
+  });
 }

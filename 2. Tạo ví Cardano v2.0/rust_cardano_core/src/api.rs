@@ -85,6 +85,18 @@ impl CardanoApi {
         }
     }
 
+    pub fn parse_transaction_ext(
+        cbor_hex: &str,
+        account_xpub_hex: Option<&str>,
+        is_testnet: bool,
+        known_active_address: Option<&str>,
+    ) -> String {
+        match TransactionParser::parse_raw_cbor_dynamic(cbor_hex, account_xpub_hex, is_testnet, known_active_address) {
+            Ok(parsed) => ApiResult::ok(parsed).to_json(),
+            Err(e) => ApiResult::<crate::tx_parser::ParsedTransaction>::err(e).to_json(),
+        }
+    }
+
     pub fn sign_transaction(
         cbor_hex: &str,
         mnemonic: &str,
@@ -278,6 +290,21 @@ pub extern "C" fn cardano_core_parse_transaction(
     let xpub = unsafe { c_char_to_str(account_xpub_hex) };
     let xpub_opt = if xpub.is_empty() { None } else { Some(xpub) };
     catch_to_json(move || CardanoApi::parse_transaction(cbor, xpub_opt, is_testnet))
+}
+
+#[no_mangle]
+pub extern "C" fn cardano_core_parse_transaction_ext(
+    cbor_hex: *const c_char,
+    account_xpub_hex: *const c_char,
+    is_testnet: bool,
+    known_active_address: *const c_char,
+) -> *mut c_char {
+    let cbor = unsafe { c_char_to_str(cbor_hex) };
+    let xpub = unsafe { c_char_to_str(account_xpub_hex) };
+    let xpub_opt = if xpub.is_empty() { None } else { Some(xpub) };
+    let known = unsafe { c_char_to_str(known_active_address) };
+    let known_opt = if known.is_empty() { None } else { Some(known) };
+    catch_to_json(move || CardanoApi::parse_transaction_ext(cbor, xpub_opt, is_testnet, known_opt))
 }
 
 #[no_mangle]

@@ -158,6 +158,7 @@ class ParsedTransaction {
   final int changeLovelace;
   final bool isChangeSafe;
   final String? securityWarning;
+  final List<String> securityWarnings;
   final String txHashHex;
   final bool hasCerts;
   final int certsCount;
@@ -177,6 +178,7 @@ class ParsedTransaction {
     required this.changeLovelace,
     required this.isChangeSafe,
     this.securityWarning,
+    this.securityWarnings = const [],
     this.txHashHex = '',
     this.hasCerts = false,
     this.certsCount = 0,
@@ -186,6 +188,48 @@ class ParsedTransaction {
     this.withdrawalsSummary = const [],
     this.requiresStakeSigning = false,
   });
+
+  ParsedTransaction copyWith({
+    int? feeLovelace,
+    int? ttl,
+    int? inputsCount,
+    List<ParsedOutput>? outputs,
+    String? recipientAddress,
+    int? sendLovelace,
+    int? changeLovelace,
+    bool? isChangeSafe,
+    String? securityWarning,
+    List<String>? securityWarnings,
+    String? txHashHex,
+    bool? hasCerts,
+    int? certsCount,
+    List<String>? certificatesSummary,
+    bool? hasWithdrawals,
+    int? withdrawalsTotalLovelace,
+    List<String>? withdrawalsSummary,
+    bool? requiresStakeSigning,
+  }) {
+    return ParsedTransaction(
+      feeLovelace: feeLovelace ?? this.feeLovelace,
+      ttl: ttl ?? this.ttl,
+      inputsCount: inputsCount ?? this.inputsCount,
+      outputs: outputs ?? this.outputs,
+      recipientAddress: recipientAddress ?? this.recipientAddress,
+      sendLovelace: sendLovelace ?? this.sendLovelace,
+      changeLovelace: changeLovelace ?? this.changeLovelace,
+      isChangeSafe: isChangeSafe ?? this.isChangeSafe,
+      securityWarning: securityWarning ?? this.securityWarning,
+      securityWarnings: securityWarnings ?? this.securityWarnings,
+      txHashHex: txHashHex ?? this.txHashHex,
+      hasCerts: hasCerts ?? this.hasCerts,
+      certsCount: certsCount ?? this.certsCount,
+      certificatesSummary: certificatesSummary ?? this.certificatesSummary,
+      hasWithdrawals: hasWithdrawals ?? this.hasWithdrawals,
+      withdrawalsTotalLovelace: withdrawalsTotalLovelace ?? this.withdrawalsTotalLovelace,
+      withdrawalsSummary: withdrawalsSummary ?? this.withdrawalsSummary,
+      requiresStakeSigning: requiresStakeSigning ?? this.requiresStakeSigning,
+    );
+  }
 
   double get feeAda => feeLovelace / 1000000.0;
   double get sendAda => sendLovelace / 1000000.0;
@@ -210,6 +254,8 @@ class ParsedTransaction {
       changeLovelace: (json['change_lovelace'] as num?)?.toInt() ?? 0,
       isChangeSafe: json['is_change_safe'] as bool? ?? true,
       securityWarning: json['security_warning'] as String?,
+      securityWarnings: (json['security_warnings'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
+          (json['security_warning'] != null ? [json['security_warning'] as String] : const []),
       txHashHex: json['tx_hash_hex'] as String? ?? '',
       hasCerts: json['has_certs'] as bool? ?? false,
       certsCount: (json['certs_count'] as num?)?.toInt() ?? 0,

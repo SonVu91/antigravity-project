@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/token_asset.dart';
+import '../../core/network/cardano_address_helper.dart';
 import '../../core/theme/hot_theme.dart';
 import '../../core/tx/tx_builder.dart';
 import '../../core/qr/qr_scanner_helper.dart';
@@ -50,28 +52,59 @@ class _BuildTxScreenState extends ConsumerState<BuildTxScreen> {
     WebQrScannerBridge.startLiveCamera((scanned) {
       WebQrScannerBridge.stopLiveCamera();
       String clean = scanned.trim();
-      // Loại bỏ tiền tố URI Cardano: cardano: hoặc web+cardano:
+
+      // 1. Nếu là JSON (ví dụ {"address": "addr_test1...", ...})
+      try {
+        if (clean.startsWith('{') && clean.endsWith('}')) {
+          final decoded = jsonDecode(clean);
+          if (decoded is Map) {
+            final possible = decoded['address'] ?? decoded['addr'] ?? decoded['target'] ?? decoded['recipient'];
+            if (possible != null && possible is String) {
+              clean = possible.trim();
+            }
+          }
+        }
+      } catch (_) {}
+
+      // 2. Loại bỏ tiền tố URI Cardano: web+cardano:, cardano://, cardano:
       if (clean.toLowerCase().startsWith('web+cardano:')) {
         clean = clean.substring('web+cardano:'.length);
+      } else if (clean.toLowerCase().startsWith('cardano://')) {
+        clean = clean.substring('cardano://'.length);
       } else if (clean.toLowerCase().startsWith('cardano:')) {
         clean = clean.substring('cardano:'.length);
       }
-      // Loại bỏ query parameters nếu có (ví dụ: ?amount=10)
+
+      // 3. Loại bỏ query parameters nếu có (ví dụ: ?amount=10)
       final queryIdx = clean.indexOf('?');
       if (queryIdx != -1) {
         clean = clean.substring(0, queryIdx);
       }
       clean = clean.trim();
+
+      // 4. Bóc tách địa chỉ Cardano Bech32 hợp lệ (addr_test1... hoặc addr1...)
+      final match = RegExp(r'(addr_test1[a-z0-9]+|addr1[a-z0-9]+)', caseSensitive: false).firstMatch(clean);
+      if (match != null) {
+        clean = match.group(0)!;
+      }
+
+      final bechDec = CardanoAddressHelper.decodeBech32(clean);
+      final bool isValidBech = bechDec != null;
+
       if (mounted) {
         setState(() {
           _recipientController.text = clean;
-          _error = null;
+          _error = isValidBech ? null : "Cảnh báo: Chuỗi vừa quét có thể không phải là địa chỉ Cardano hợp lệ!";
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("✓ Đã nhận diện địa chỉ ví người nhận!"),
-            backgroundColor: HotTheme.safeGreen,
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: Text(
+              isValidBech
+                  ? "✓ Đã nhận diện địa chỉ ví thành công (${clean.substring(0, 15)}...)!"
+                  : "Đã điền nội dung quét được vào ô địa chỉ.",
+            ),
+            backgroundColor: isValidBech ? HotTheme.safeGreen : Colors.orange,
+            duration: const Duration(seconds: 2),
           ),
         );
       }

@@ -13,6 +13,7 @@ import 'hot_settings_screen.dart';
 import 'withdraw_reward_screen.dart';
 import 'delegate_tx_screen.dart';
 import '../../core/network/stake_account_info.dart';
+import '../../core/utils/cardanoscan_helper.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -783,6 +784,114 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             ),
                           ],
                         ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 3.5. THẺ ĐỐI CHIẾU DỮ LIỆU ON-CHAIN (CARDANOSCAN EXPLORER)
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: HotTheme.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.blueAccent.withOpacity(0.35)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.blueAccent.withOpacity(0.18),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.travel_explore_rounded, color: Colors.blueAccent, size: 18),
+                              ),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  "KIỂM TRA & ĐỐI CHIẾU ON-CHAIN",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12.5,
+                                    letterSpacing: 0.5,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.blueAccent.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: Colors.blueAccent.withOpacity(0.4)),
+                                ),
+                                child: Text(
+                                  state.network.name.toUpperCase(),
+                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            "Mọi dữ liệu số dư, UTXO và lịch sử giao dịch đều có thể kiểm chứng độc lập trực tiếp trên blockchain explorer:",
+                            style: TextStyle(color: Colors.grey[400], fontSize: 11.5, height: 1.3),
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.black38,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.white12),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: SelectableText(
+                                    state.watchedAddress != null
+                                        ? CardanoscanHelper.getAddressUrl(state.network, state.watchedAddress!)
+                                        : CardanoscanHelper.getBaseUrl(state.network),
+                                    style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Colors.lightBlueAccent),
+                                    maxLines: 1,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(6),
+                                  onTap: () {
+                                    final url = state.watchedAddress != null
+                                        ? CardanoscanHelper.getAddressUrl(state.network, state.watchedAddress!)
+                                        : CardanoscanHelper.getBaseUrl(state.network);
+                                    ClipboardHelper.copy(
+                                      context,
+                                      url,
+                                      message: "Đã sao chép liên kết Cardanoscan vào bộ nhớ tạm!",
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blueAccent.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.copy_rounded, size: 13, color: Colors.lightBlueAccent),
+                                        SizedBox(width: 4),
+                                        Text("Sao Chép", style: TextStyle(fontSize: 11, color: Colors.lightBlueAccent, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 16),

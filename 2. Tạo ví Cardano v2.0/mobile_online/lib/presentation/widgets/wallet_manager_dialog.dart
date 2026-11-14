@@ -210,15 +210,33 @@ class _WalletManagerDialogState extends ConsumerState<WalletManagerDialog> {
             child: const Text("Hủy"),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              minimumSize: const Size(100, 44),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
             onPressed: () {
               ref.read(hotWalletProvider.notifier).removeWatchedWallet(wallet.id);
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("Đã xóa ví '${wallet.name}'")),
-              );
+              Navigator.pop(ctx); // Đóng AlertDialog xác nhận xóa
+
+              final remaining = ref.read(hotWalletProvider).watchedWallets;
+              if (remaining.isEmpty) {
+                // Đã xóa chiếc ví cuối cùng! Tự động đóng modal quản lý và chuyển về màn hình nạp ví ban đầu (SetupWatchScreen)
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Đã xóa ví cuối cùng. Vui lòng thêm ví để tiếp tục."),
+                    backgroundColor: HotTheme.accent,
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Đã xóa ví '${wallet.name}'")),
+                );
+              }
             },
-            child: const Text("Xác Nhận Xóa", style: TextStyle(color: Colors.white)),
+            child: const Text("Xác Nhận Xóa", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -341,20 +359,41 @@ class _WalletManagerDialogState extends ConsumerState<WalletManagerDialog> {
             Expanded(
               child: state.watchedWallets.isEmpty
                   ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.folder_off, size: 48, color: Colors.grey),
-                          const SizedBox(height: 8),
-                          const Text("Chưa có ví nào trong danh sách.", style: TextStyle(color: Colors.grey)),
-                          const SizedBox(height: 16),
-                          ElevatedButton.icon(
-                            icon: const Icon(Icons.add),
-                            label: const Text("Thêm Ví Đầu Tiên"),
-                            style: ElevatedButton.styleFrom(backgroundColor: HotTheme.accent),
-                            onPressed: _openAddWalletDialog,
-                          ),
-                        ],
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.folder_off_outlined, size: 54, color: Colors.grey),
+                            const SizedBox(height: 12),
+                            const Text(
+                              "Chưa có ví nào trong danh sách theo dõi.",
+                              style: TextStyle(color: Colors.white70, fontSize: 14),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              "Bấm nút dưới đây để nạp địa chỉ Cardano đầu tiên.",
+                              style: TextStyle(color: Colors.grey, fontSize: 12),
+                            ),
+                            const SizedBox(height: 20),
+                            SizedBox(
+                              height: 48,
+                              child: ElevatedButton.icon(
+                                icon: const Icon(Icons.add_circle_outline, color: Colors.black, size: 20),
+                                label: const Text(
+                                  "Thêm Ví Đầu Tiên",
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: HotTheme.accent,
+                                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  elevation: 2,
+                                ),
+                                onPressed: _openAddWalletDialog,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     )
                   : ListView.builder(
@@ -521,23 +560,27 @@ class _WalletManagerDialogState extends ConsumerState<WalletManagerDialog> {
                     ),
             ),
 
-            const SizedBox(height: 12),
-
-            // Nút Thêm Ví Mới
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.add),
-                label: const Text("Thêm Ví Theo Dõi Mới", style: TextStyle(fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: HotTheme.accent,
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            if (state.watchedWallets.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              // Nút Thêm Ví Mới (chỉ hiển thị khi đã có danh sách ví)
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.add, color: Colors.black, size: 20),
+                  label: const Text(
+                    "Thêm Ví Theo Dõi Mới",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: HotTheme.accent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 2,
+                  ),
+                  onPressed: _openAddWalletDialog,
                 ),
-                onPressed: _openAddWalletDialog,
               ),
-            ),
+            ],
           ],
         ),
       ),

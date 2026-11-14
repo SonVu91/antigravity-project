@@ -38,6 +38,7 @@ class HotTheme {
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+          minimumSize: const Size(64, 48),
           textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
         ),
       ),
@@ -46,7 +47,9 @@ class HotTheme {
           foregroundColor: accent,
           side: const BorderSide(color: accent, width: 1.2),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+          minimumSize: const Size(64, 48),
+          textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
         ),
       ),
       cardTheme: CardTheme(

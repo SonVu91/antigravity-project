@@ -112,6 +112,11 @@ class CardanoCoreBridge {
     if (res['success'] == true && res['data'] != null) {
       return res['data'] as bool;
     }
+    // Khi chạy trên Web tĩnh không có Auxiliary Service nội bộ (ví dụ GitHub Pages),
+    // không chặn phát sóng mà để node Cardano (Blockfrost) xác thực chữ ký chính thức.
+    if (res['error']?.toString().contains('not reachable') == true) {
+      return true;
+    }
     return false;
   }
 

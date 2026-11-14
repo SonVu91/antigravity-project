@@ -45,6 +45,43 @@ class _BuildTxScreenState extends ConsumerState<BuildTxScreen> {
     super.dispose();
   }
 
+  void _onScanRecipientQr() {
+    FocusScope.of(context).unfocus();
+    WebQrScannerBridge.startLiveCamera((scanned) {
+      WebQrScannerBridge.stopLiveCamera();
+      String clean = scanned.trim();
+      // Loại bỏ tiền tố URI Cardano: cardano: hoặc web+cardano:
+      if (clean.toLowerCase().startsWith('web+cardano:')) {
+        clean = clean.substring('web+cardano:'.length);
+      } else if (clean.toLowerCase().startsWith('cardano:')) {
+        clean = clean.substring('cardano:'.length);
+      }
+      // Loại bỏ query parameters nếu có (ví dụ: ?amount=10)
+      final queryIdx = clean.indexOf('?');
+      if (queryIdx != -1) {
+        clean = clean.substring(0, queryIdx);
+      }
+      clean = clean.trim();
+      if (mounted) {
+        setState(() {
+          _recipientController.text = clean;
+          _error = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("✓ Đã nhận diện địa chỉ ví người nhận!"),
+            backgroundColor: HotTheme.safeGreen,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }, onError: (err) {
+      if (mounted) {
+        setState(() => _error = "Không thể mở camera: $err");
+      }
+    });
+  }
+
   double get _currentMinAda {
     return TransactionBuilder.calculateMinUtxoAda(_selectedTokens.length);
   }
@@ -285,18 +322,51 @@ class _BuildTxScreenState extends ConsumerState<BuildTxScreen> {
                     IconButton(
                       tooltip: "Bật Camera Quét QR",
                       icon: const Icon(Icons.qr_code_scanner, color: HotTheme.accent),
-                      onPressed: () {
-                        WebQrScannerBridge.startLiveCamera((scanned) {
-                          WebQrScannerBridge.stopLiveCamera();
-                          setState(() {
-                            _recipientController.text = scanned.trim();
-                          });
-                        });
-                      },
+                      onPressed: _onScanRecipientQr,
                     ),
                   ],
                 ),
               ),
+            ),
+            const SizedBox(height: 8),
+            // Thanh thao tác nhanh cho Mobile (Nút lớn dễ chạm, không bị bàn phím che)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: HotTheme.accent,
+                      side: BorderSide(color: HotTheme.accent.withOpacity(0.5)),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.paste_rounded, size: 18),
+                    label: const Text("Dán Địa Chỉ", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    onPressed: () async {
+                      await ClipboardHelper.paste(
+                        context,
+                        targetController: _recipientController,
+                        fieldName: "Địa chỉ người nhận",
+                      );
+                      setState(() {});
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: HotTheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.qr_code_scanner, size: 18, color: HotTheme.accent),
+                    label: const Text("Quét Mã QR", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    onPressed: _onScanRecipientQr,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             // Ô nhập số lượng ADA

@@ -279,7 +279,7 @@ class BlockfrostClient {
         "rewards_sum": "15800000",
         "withdrawals_sum": "0",
         "withdrawable_amount": "15800000", // 15.8 ADA
-        "pool_id": "pool1z22x5eljjsyyt9qqfqxc99s5q0vgpd409smqlmgpqamm2f3eh88",
+        "pool_id": StakeAccountInfo.preprodPoolId,
       };
     }
     return null;
@@ -344,7 +344,7 @@ class BlockfrostClient {
     } catch (_) {}
 
     if (network == CardanoNetwork.preprod) {
-      return ["pool1z22x5eljjsyyt9qqfqxc99s5q0vgpd409smqlmgpqamm2f3eh88"];
+      return [StakeAccountInfo.preprodPoolId];
     }
     return [StakeAccountInfo.fimiPoolId];
   }

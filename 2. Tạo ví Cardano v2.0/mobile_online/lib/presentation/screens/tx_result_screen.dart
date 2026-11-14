@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/hot_theme.dart';
+import '../../core/utils/cardanoscan_helper.dart';
+import '../providers/hot_wallet_provider.dart';
 
-class TxResultScreen extends StatelessWidget {
+class TxResultScreen extends ConsumerWidget {
   final String txId;
 
   const TxResultScreen({super.key, required this.txId});
 
   @override
-  Widget build(BuildContext context) {
-    final explorerUrl = "https://preprod.cardanoscan.io/transaction/$txId";
+  Widget build(BuildContext context, WidgetRef ref) {
+    final network = ref.watch(hotWalletProvider).network;
+    final explorerUrl = CardanoscanHelper.getTxUrl(network, txId);
 
     return Scaffold(
       appBar: AppBar(
@@ -73,18 +77,43 @@ class TxResultScreen extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("TRA CỨU TRÊN CARDANOSCAN:", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    Row(
+                      children: [
+                        const Icon(Icons.travel_explore_rounded, color: HotTheme.accent, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          "ĐỐI CHIẾU TRÊN CARDANOSCAN (${network.name.toUpperCase()}):",
+                          style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      "Bạn có thể mở hoặc sao chép liên kết bên dưới để theo dõi trạng thái khối được xác nhận trên Cardanoscan:",
+                      style: TextStyle(color: HotTheme.textMuted, fontSize: 11.5),
+                    ),
                     const SizedBox(height: 8),
                     SelectableText(
                       explorerUrl,
-                      style: const TextStyle(fontSize: 12, color: Colors.blueAccent),
+                      style: const TextStyle(fontSize: 12, color: Colors.blueAccent, fontFamily: 'monospace'),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.open_in_new, size: 16, color: HotTheme.accent),
+                      label: const Text("Sao Chép Link Cardanoscan"),
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: explorerUrl));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Đã sao chép liên kết Cardanoscan vào Clipboard!")),
+                        );
+                      },
                     ),
                   ],
                 ),

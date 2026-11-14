@@ -263,7 +263,7 @@ class _DelegateTxScreenState extends ConsumerState<DelegateTxScreen> {
                           title: const Wrap(
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              Text("Preprod Stake Pool (Khuyến nghị) ", style: TextStyle(fontWeight: FontWeight.bold)),
+                              Text("[CSN1] Cardanoscan Pool 1 ", style: TextStyle(fontWeight: FontWeight.bold)),
                               Badge(label: Text("PREPROD", style: TextStyle(fontSize: 10))),
                             ],
                           ),

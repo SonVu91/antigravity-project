@@ -1,8 +1,26 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cardano_airgap_bridge/cardano_airgap_bridge.dart';
 import 'package:mobile_online/core/models/watched_wallet_entry.dart';
 import 'package:mobile_online/presentation/providers/hot_wallet_provider.dart';
+import 'package:mobile_online/presentation/widgets/wallet_manager_dialog.dart';
+
+class _TestHotWalletNotifier extends HotWalletNotifier {
+  _TestHotWalletNotifier(HotWalletState initial) : super() {
+    state = initial;
+  }
+
+  @override
+  Future<void> initAndLoad() async {}
+
+  @override
+  Future<void> fetchBalance() async {}
+
+  @override
+  Future<void> fetchAllBalances() async {}
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -108,6 +126,58 @@ void main() {
       notifier.removeWatchedWallet('addr_1');
       expect(notifier.state.watchedWallets.isEmpty, isTrue);
       expect(notifier.state.watchedAddress, isNull);
+      // Total portfolio balance must be 0.0, never retain old balance
+      expect(notifier.state.totalPortfolioAda, 0.0);
+      expect(notifier.state.balanceAda, 0.0);
+    });
+
+    testWidgets('6. WalletManagerDialog empty state has single button & deleting last wallet auto-closes dialog', (tester) async {
+      final notifier = _TestHotWalletNotifier(
+        HotWalletState(
+          watchedAddress: 'addr_single',
+          watchedWallets: [
+            WatchedWalletEntry(
+              id: 'w_1',
+              name: 'Chung-Ví 1',
+              address: 'addr_single',
+            ),
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            hotWalletProvider.overrideWith((ref) => notifier),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                height: 800,
+                child: WalletManagerDialog(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // With 1 wallet, bottom button "Thêm Ví Theo Dõi Mới" exists
+      expect(find.text("Thêm Ví Theo Dõi Mới"), findsOneWidget);
+      expect(find.text("Thêm Ví Đầu Tiên"), findsNothing);
+
+      // Now simulate deleting the only wallet
+      notifier.state = notifier.state.copyWith(
+        watchedWallets: [],
+        clearWatchedAddress: true,
+        clearActiveWallet: true,
+      );
+      await tester.pump();
+
+      // Now with 0 wallets, empty state shows single "Thêm Ví Đầu Tiên" and hides bottom button
+      expect(find.text("Thêm Ví Đầu Tiên"), findsOneWidget);
+      expect(find.text("Thêm Ví Theo Dõi Mới"), findsNothing);
+      expect(notifier.state.totalPortfolioAda, 0.0);
     });
   });
 }

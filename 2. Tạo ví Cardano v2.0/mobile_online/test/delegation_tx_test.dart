@@ -38,6 +38,22 @@ void main() {
       expect(result.isDelegation, isTrue);
     });
 
+    test('Build combined Preprod CSN1 Pool and Always Abstain DRep delegation', () {
+      final result = TransactionBuilder.buildDelegationTx(
+        senderAddress: senderAddr,
+        stakeAddress: stakeAddr,
+        poolId: StakeAccountInfo.preprodPoolId,
+        drepId: 'always_abstain',
+        isStakeKeyRegistered: true,
+        utxos: mockUtxos,
+      );
+
+      expect(result.rawCborHex.startsWith('TxBodyConwayDelegation:'), isTrue);
+      expect(result.delegatedPoolId, equals(StakeAccountInfo.preprodPoolId));
+      expect(result.delegatedDRepId, equals('always_abstain'));
+      expect(result.isDelegation, isTrue);
+    });
+
     test('Build combined delegation with 2 ADA Key Deposit if unregistered', () {
       final result = TransactionBuilder.buildDelegationTx(
         senderAddress: senderAddr,

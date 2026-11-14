@@ -69,7 +69,7 @@ class HotWalletState {
   }
 
   double get totalPortfolioAda {
-    if (watchedWallets.isEmpty) return balanceAda;
+    if (watchedWallets.isEmpty) return 0.0;
     return watchedWallets.fold(0.0, (sum, w) => sum + w.cachedBalanceAda);
   }
 
@@ -584,9 +584,14 @@ class HotWalletNotifier extends StateNotifier<HotWalletState> {
   Future<String> submitSignedTx(String signedCborHex) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
+      final cleanHex = signedCborHex.trim();
+      if (cleanHex.length < 64 || !RegExp(r'^[0-9a-fA-F]+$').hasMatch(cleanHex)) {
+        throw Exception("LỖI ĐỊNH DẠNG: Chuỗi giao dịch đã ký không phải là chuỗi CBOR Hex hợp lệ!");
+      }
+
       // 1. Xác minh chữ ký Ed25519 độc lập trước khi phát sóng (Pre-broadcast Cryptographic Verification)
       try {
-        final isValid = CardanoCoreBridge.verifySignedTransaction(signedCborHex);
+        final isValid = CardanoCoreBridge.verifySignedTransaction(cleanHex);
         if (!isValid) {
           throw Exception("LỖI XÁC THỰC MẬT MÃ: Chữ ký Ed25519 trong giao dịch không hợp lệ hoặc đã bị can thiệp!");
         }
@@ -598,7 +603,7 @@ class HotWalletNotifier extends StateNotifier<HotWalletState> {
       if (state.lastBuiltTx != null) {
         try {
           final parsed = CardanoCoreBridge.parseTransaction(
-            signedCborHex,
+            cleanHex,
             isTestnet: state.network != CardanoNetwork.mainnet,
           );
           if (state.lastBuiltTx!.sendLovelace > 0 && parsed.sendLovelace != state.lastBuiltTx!.sendLovelace) {
@@ -611,7 +616,7 @@ class HotWalletNotifier extends StateNotifier<HotWalletState> {
         }
       }
 
-      final txid = await _client.submitTx(signedCborHex);
+      final txid = await _client.submitTx(cleanHex);
       final newHistory = List<Map<String, dynamic>>.from(state.txHistory);
       newHistory.insert(0, {
         "txId": txid,

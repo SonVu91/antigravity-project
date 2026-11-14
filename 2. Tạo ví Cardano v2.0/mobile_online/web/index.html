@@ -59,35 +59,95 @@
       left: 0;
       width: 100vw;
       height: 100vh;
-      background: rgba(10, 12, 16, 0.94);
+      background: rgba(10, 12, 16, 0.96);
       z-index: 9999999;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       padding: 16px;
       box-sizing: border-box;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
 
     #qr-reader-container {
       width: 100%;
       max-width: 440px;
-      background: #181c24;
+      min-height: 320px;
+      position: relative;
+      background: #131720;
       border: 2px solid #ff6b00;
       border-radius: 16px;
       overflow: hidden;
       box-shadow: 0 12px 36px rgba(255, 107, 0, 0.25);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
 
     #qr-reader {
       width: 100% !important;
+      min-height: 320px;
       border: none !important;
     }
 
     #qr-reader video {
       border-radius: 12px;
       object-fit: cover !important;
+      width: 100% !important;
+      height: 100% !important;
+      min-height: 280px;
+    }
+
+    /* Loading Overlay */
+    #qr-loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #131720;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      color: #cbd5e1;
+      font-size: 14px;
+      gap: 12px;
+    }
+
+    .qr-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255, 107, 0, 0.2);
+      border-top-color: #ff6b00;
+      border-radius: 50%;
+      animation: qr-spin 0.8s linear infinite;
+    }
+
+    @keyframes qr-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Error Overlay */
+    #qr-error-overlay {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #181c24;
+      padding: 20px;
+      box-sizing: border-box;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      z-index: 11;
+      color: #ffffff;
     }
 
     .qr-modal-header {
@@ -109,16 +169,45 @@
       gap: 8px;
     }
 
+    .qr-header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .qr-modal-btn-action {
+      background: #2a2e39;
+      border: 1px solid #454d5d;
+      color: #e0e0e0;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      min-height: 40px;
+    }
+
+    .qr-modal-btn-action:hover {
+      background: #383f4f;
+      border-color: #ff6b00;
+      color: #ffffff;
+    }
+
     .qr-modal-btn-close {
       background: #2a2e39;
       border: 1px solid #454d5d;
       color: #e0e0e0;
       border-radius: 8px;
-      padding: 8px 16px;
-      font-size: 14px;
+      padding: 8px 14px;
+      font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: all 0.2s;
+      min-height: 40px;
     }
 
     .qr-modal-btn-close:hover {
@@ -178,22 +267,45 @@
     window.CardanoWebQrScanner = {
       html5QrCode: null,
       isScanning: false,
+      availableCameras: [],
+      currentCameraIndex: 0,
+      isStarting: false,
 
-      startCamera: function() {
+      startCamera: async function() {
+        if (window.CardanoWebQrScanner.isStarting) return;
+        window.CardanoWebQrScanner.isStarting = true;
+
         var modal = document.getElementById("qr-scanner-modal");
         if (modal) modal.style.display = "flex";
+        
+        var loading = document.getElementById("qr-loading-overlay");
+        if (loading) loading.style.display = "flex";
+        
+        var errBox = document.getElementById("qr-error-overlay");
+        if (errBox) errBox.style.display = "none";
+
         var pBox = document.getElementById("qr-progress-box");
         if (pBox) pBox.style.display = "none";
 
-        if (!window.CardanoWebQrScanner.html5QrCode) {
+        // Chờ 150ms để trình duyệt hoàn tất CSS layout reflow cho modal flexbox
+        await new Promise(function(r) { setTimeout(r, 150); });
+
+        // Vòng đời sạch: Giải phóng an toàn instance cũ nếu có
+        await window.CardanoWebQrScanner._cleanExistingScanner();
+
+        // Tạo mới instance scanner
+        try {
           window.CardanoWebQrScanner.html5QrCode = new Html5Qrcode("qr-reader");
+        } catch (e) {
+          console.warn("Could not create Html5Qrcode instance:", e);
         }
 
+        // Cấu hình quét
         var config = {
           fps: 25,
           qrbox: function(viewfinderWidth, viewfinderHeight) {
             var minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            var boxSize = Math.floor(minEdge * 0.75);
+            var boxSize = Math.floor(minEdge * 0.78);
             return { width: boxSize, height: boxSize };
           },
           aspectRatio: 1.0,
@@ -202,20 +314,174 @@
           }
         };
 
-        window.CardanoWebQrScanner.html5QrCode.start(
-          { facingMode: "environment" },
-          config,
-          function(decodedText, decodedResult) {
-            if (window.onCardanoQrScanned) {
-              window.onCardanoQrScanned(decodedText);
+        // Quét danh sách thiết bị camera vật lý để tìm camera sau tối ưu
+        var cameraConfig = { facingMode: "environment" };
+        try {
+          var cameras = await Html5Qrcode.getCameras();
+          if (cameras && cameras.length > 0) {
+            window.CardanoWebQrScanner.availableCameras = cameras;
+            // Tìm camera sau (back / rear / sau / environment)
+            var backIdx = -1;
+            for (var i = 0; i < cameras.length; i++) {
+              var lbl = (cameras[i].label || "").toLowerCase();
+              if (lbl.includes("back") || lbl.includes("rear") || lbl.includes("sau") || lbl.includes("environment")) {
+                backIdx = i;
+                break;
+              }
             }
-          },
-          function(errorMessage) {}
-        ).catch(function(err) {
-          console.error("Camera start error:", err);
-          alert("Không thể khởi động Camera: " + err + "\n\nLưu ý: iOS Safari và Chrome yêu cầu mở trang web qua HTTPS hoặc localhost để cấp quyền truy cập Camera.");
-          window.CardanoWebQrScanner.stopCamera();
+            if (backIdx !== -1) {
+              window.CardanoWebQrScanner.currentCameraIndex = backIdx;
+              cameraConfig = cameras[backIdx].id;
+            } else {
+              window.CardanoWebQrScanner.currentCameraIndex = 0;
+              cameraConfig = cameras[0].id;
+            }
+          }
+        } catch (e) {
+          console.warn("Html5Qrcode.getCameras() skipped or failed:", e);
+        }
+
+        // Bắt đầu khởi động Camera với cơ chế tự động thử lại (Fallback)
+        try {
+          await window.CardanoWebQrScanner._attemptStart(cameraConfig, config);
+        } catch (firstErr) {
+          console.warn("First camera attempt failed, trying fallback:", firstErr);
+          try {
+            // Fallback 1: Thử lại với facingMode "environment"
+            await window.CardanoWebQrScanner._attemptStart({ facingMode: "environment" }, config);
+          } catch (secErr) {
+            console.warn("Fallback 1 failed, trying fallback 2 (any video):", secErr);
+            try {
+              // Fallback 2: Thử bất kỳ camera nào khả dụng
+              await window.CardanoWebQrScanner._attemptStart({ facingMode: "user" }, config);
+            } catch (finalErr) {
+              console.error("All camera start attempts failed:", finalErr);
+              window.CardanoWebQrScanner._showErrorUI(finalErr);
+            }
+          }
+        } finally {
+          window.CardanoWebQrScanner.isStarting = false;
+        }
+      },
+
+      _attemptStart: function(cameraConfig, config) {
+        return new Promise(function(resolve, reject) {
+          if (!window.CardanoWebQrScanner.html5QrCode) {
+            reject("Scanner instance not ready");
+            return;
+          }
+          window.CardanoWebQrScanner.html5QrCode.start(
+            cameraConfig,
+            config,
+            function(decodedText, decodedResult) {
+              if (navigator.vibrate) {
+                try { navigator.vibrate(60); } catch(v) {}
+              }
+              if (window.onCardanoQrScanned) {
+                window.onCardanoQrScanned(decodedText);
+              }
+            },
+            function(errorMessage) {}
+          ).then(function() {
+            window.CardanoWebQrScanner.isScanning = true;
+            var loading = document.getElementById("qr-loading-overlay");
+            if (loading) loading.style.display = "none";
+            // Cưỡng bức các thuộc tính mobile video: playsinline, autoplay, muted
+            try {
+              var v = document.querySelector("#qr-reader video");
+              if (v) {
+                v.setAttribute("playsinline", "true");
+                v.setAttribute("webkit-playsinline", "true");
+                v.setAttribute("autoplay", "true");
+                v.muted = true;
+                if (v.paused) {
+                  v.play().catch(function(e) { console.warn("Video play error:", e); });
+                }
+              }
+            } catch (ve) {}
+            resolve();
+          }).catch(function(err) {
+            reject(err);
+          });
         });
+      },
+
+      _cleanExistingScanner: async function() {
+        if (window.CardanoWebQrScanner.html5QrCode) {
+          var sc = window.CardanoWebQrScanner.html5QrCode;
+          window.CardanoWebQrScanner.html5QrCode = null;
+          window.CardanoWebQrScanner.isScanning = false;
+          try {
+            if (sc.isScanning) {
+              await sc.stop();
+            }
+          } catch (e) {
+            console.warn("Stop scanner error:", e);
+          }
+          try {
+            await sc.clear();
+          } catch (e) {}
+        }
+        var reader = document.getElementById("qr-reader");
+        if (reader) reader.innerHTML = "";
+      },
+
+      switchCamera: async function() {
+        var cams = window.CardanoWebQrScanner.availableCameras;
+        if (!cams || cams.length < 2) {
+          // Nếu chưa có danh sách hoặc chỉ 1 camera, reload thử tìm camera khác
+          try {
+            var fresh = await Html5Qrcode.getCameras();
+            if (fresh && fresh.length > 1) {
+              window.CardanoWebQrScanner.availableCameras = fresh;
+              cams = fresh;
+            } else {
+              alert("Thiết bị của bạn chỉ có 1 camera hoặc không phát hiện camera phụ.");
+              return;
+            }
+          } catch (e) {
+            alert("Không thể chuyển đổi camera trên thiết bị này.");
+            return;
+          }
+        }
+        window.CardanoWebQrScanner.currentCameraIndex = (window.CardanoWebQrScanner.currentCameraIndex + 1) % cams.length;
+        var nextCamId = cams[window.CardanoWebQrScanner.currentCameraIndex].id;
+
+        var loading = document.getElementById("qr-loading-overlay");
+        if (loading) loading.style.display = "flex";
+
+        await window.CardanoWebQrScanner._cleanExistingScanner();
+        try {
+          window.CardanoWebQrScanner.html5QrCode = new Html5Qrcode("qr-reader");
+          var config = {
+            fps: 25,
+            qrbox: function(w, h) {
+              var minEdge = Math.min(w, h);
+              var boxSize = Math.floor(minEdge * 0.78);
+              return { width: boxSize, height: boxSize };
+            },
+            aspectRatio: 1.0
+          };
+          await window.CardanoWebQrScanner._attemptStart(nextCamId, config);
+        } catch (e) {
+          console.error("Switch camera error:", e);
+          window.CardanoWebQrScanner._showErrorUI(e);
+        }
+      },
+
+      _showErrorUI: function(err) {
+        var loading = document.getElementById("qr-loading-overlay");
+        if (loading) loading.style.display = "none";
+
+        var errBox = document.getElementById("qr-error-overlay");
+        var errMsg = document.getElementById("qr-error-message");
+        if (errBox) {
+          errBox.style.display = "flex";
+          if (errMsg) {
+            errMsg.innerHTML = "<b>Không thể mở Camera:</b> " + (err || "Trình duyệt chặn quyền truy cập.") + 
+              "<br><br><small style='color:#94a3b8;'>Lưu ý: iOS Safari và Chrome yêu cầu cho phép quyền Camera trong Cài đặt trang web hoặc mở qua HTTPS.</small>";
+          }
+        }
       },
 
       updateProgress: function(received, total) {
@@ -230,21 +496,15 @@
         }
       },
 
-      stopCamera: function() {
+      stopCamera: async function() {
         var modal = document.getElementById("qr-scanner-modal");
         if (modal) modal.style.display = "none";
         var pBox = document.getElementById("qr-progress-box");
         if (pBox) pBox.style.display = "none";
+        var errBox = document.getElementById("qr-error-overlay");
+        if (errBox) errBox.style.display = "none";
 
-        if (window.CardanoWebQrScanner.html5QrCode) {
-          try {
-            window.CardanoWebQrScanner.html5QrCode.stop().then(function() {
-              console.log("Camera stopped cleanly");
-            }).catch(function(e) {
-              console.warn("Camera stop error:", e);
-            });
-          } catch(e) {}
-        }
+        await window.CardanoWebQrScanner._cleanExistingScanner();
       }
     };
 
@@ -262,11 +522,38 @@
       <div class="qr-modal-title">
         <span>📷 Quét Mã QR (Air-Gap Scanner)</span>
       </div>
-      <button class="qr-modal-btn-close" onclick="window.CardanoWebQrScanner.stopCamera()">✕ Đóng</button>
+      <div class="qr-header-actions">
+        <button class="qr-modal-btn-action" onclick="window.CardanoWebQrScanner.switchCamera()" title="Đổi camera trước / sau">
+          <span>🔄</span> Đổi Cam
+        </button>
+        <button class="qr-modal-btn-close" onclick="window.CardanoWebQrScanner.stopCamera()">✕ Đóng</button>
+      </div>
     </div>
+    
     <div id="qr-reader-container">
       <div id="qr-reader"></div>
+
+      <!-- Trạng thái chờ kết nối camera -->
+      <div id="qr-loading-overlay">
+        <div class="qr-spinner"></div>
+        <div>Đang kết nối Camera...</div>
+      </div>
+
+      <!-- Trạng thái lỗi và nút Thử Lại -->
+      <div id="qr-error-overlay">
+        <div style="font-size: 32px; margin-bottom: 8px;">⚠️</div>
+        <div id="qr-error-message" style="font-size: 13px; line-height: 1.5; margin-bottom: 16px;"></div>
+        <div style="display: flex; gap: 10px;">
+          <button class="qr-modal-btn-action" style="border-color: #ff6b00;" onclick="window.CardanoWebQrScanner.startCamera()">
+            <span>🔄</span> Thử Lại
+          </button>
+          <button class="qr-modal-btn-close" onclick="window.CardanoWebQrScanner.stopCamera()">
+            ✕ Đóng
+          </button>
+        </div>
+      </div>
     </div>
+
     <div id="qr-progress-box">
       <div class="qr-progress-row">
         <span>Tiến độ quét QR Động:</span>
@@ -277,7 +564,7 @@
       </div>
     </div>
     <div class="qr-modal-tip">
-      Hướng camera về phía màn hình Ví Lạnh.<br>Hệ thống tự động tiếp nhận mã QR tĩnh hoặc QR động nhiều mảnh (Multipart UR).
+      Hướng camera về phía màn hình Ví Lạnh.<br>Hệ thống tự động tiếp nhận mã QR tĩnh hoặc QR động nhiều mảnh (Multipart QR).
     </div>
   </div>
 

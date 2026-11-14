@@ -10,7 +10,7 @@ class StakeAccountInfo {
 
   static const String fimiPoolId = "pool1rct5guwnp6nk9f4ldn5tr3s42j0nm5rxeayv56lxua5ck47ex39";
   static const String fimiDRepId = "drep1xgzlpyy3pvywm5wvhkvyz9cpga5wylme6wdu6l9vn5g6cp38jdj";
-  static const String preprodPoolId = "pool1z22x5eljjsyyt9qqfqxc99s5q0vgpd409smqlmgpqamm2f3eh88";
+  static const String preprodPoolId = "pool10hex9l4wjgqarvhr94xgyh9frv5lhtajhrj4dah0kl65jtws30k"; // [CSN1] Cardanoscan Pool 1 (Preprod)
 
   StakeAccountInfo({
     required this.stakeAddress,

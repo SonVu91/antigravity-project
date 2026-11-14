@@ -6,6 +6,7 @@ import '../../core/network/blockfrost_client.dart';
 import '../../core/theme/hot_theme.dart';
 import '../../core/migration/hot_migration_service.dart';
 import '../../core/update/hot_update_service.dart';
+import '../../core/utils/cardanoscan_helper.dart';
 import '../providers/hot_wallet_provider.dart';
 import 'setup_watch_screen.dart';
 
@@ -466,6 +467,26 @@ class _HotSettingsScreenState extends ConsumerState<HotSettingsScreen> {
                       context,
                       MaterialPageRoute(builder: (_) => const SetupWatchScreen()),
                     ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Card: Cardanoscan On-Chain Explorer Link
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.travel_explore_rounded, color: Colors.blueAccent),
+                    title: const Text("Khám Phá On-Chain (Cardanoscan)"),
+                    subtitle: Text("Tra cứu ví và dữ liệu chuỗi tại ${CardanoscanHelper.getBaseUrl(state.network)}"),
+                    trailing: const Icon(Icons.copy_rounded, size: 18),
+                    onTap: () {
+                      final url = state.watchedAddress != null
+                          ? CardanoscanHelper.getAddressUrl(state.network, state.watchedAddress!)
+                          : CardanoscanHelper.getBaseUrl(state.network);
+                      Clipboard.setData(ClipboardData(text: url));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Đã sao chép liên kết Cardanoscan vào bộ nhớ tạm!")),
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(height: 16),

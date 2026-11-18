@@ -11,14 +11,15 @@ Tài liệu này định nghĩa các quy tắc cốt lõi để đảm bảo d�
 
 ```
 E:\Antigravity\  (hoặc thư mục gốc trên máy tính khác)
-├── 2. Tạo ví Cardano v2.0/           # Dự án 2: Cardano Hot Wallet & Watch-Only Hub v2.0
+├── 1. Tạo ví Cardano/               # Dự án 1: Cardano Air-Gap Dual-Wallet System (Hot & Cold Vault)
 │   ├── .agents/                      # Kỹ năng AI cấp dự án (Security, Code-Review)
 │   ├── cardano_airgap_bridge/        # Thư viện Dart pure & FFI Bridge
+│   ├── mobile_cold/                  # Ứng dụng Flutter Cold Wallet (Lưu trữ cục bộ - Local only)
 │   ├── mobile_online/                # Ứng dụng Flutter Hot Wallet (Web PWA & Android APK)
 │   ├── rust_cardano_core/            # Thư viện lõi Rust mật mã & Bech32
-│   ├── output/                       # Các bản build release (APK Hot Wallet, Web bundle)
+│   ├── output/                       # Các bản build release (APK Cold & Hot Wallet, Web bundle)
 │   └── docs/                         # Tài liệu kỹ thuật & kiểm định an ninh
-├── 3. [Dự án tiếp theo]/             # Các dự án về sau sẽ nằm trong từng thư mục riêng
+├── 2. [Dự án tiếp theo]/             # Các dự án về sau sẽ nằm trong từng thư mục riêng
 ├── AGENTS.md                         # Quy tắc AI toàn hệ thống (tệp này)
 ├── README.md                         # Tài liệu tổng thể Monorepo & Hướng dẫn bắt đầu nhanh
 ├── sync_pull.bat / .ps1              # Kịch bản 1-click kéo code mới từ GitHub khi mở máy

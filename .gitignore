@@ -24,6 +24,10 @@ Thumbs.db
 **/config.env
 !**/*.env.example
 
+# Cold Wallet Application - Local storage only, never push to GitHub
+**/mobile_cold/
+**/mobile_cold/**
+
 # Temporary Cardano transaction artifacts
 **/*.draft
 **/*.raw

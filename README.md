@@ -9,8 +9,8 @@ Kho lưu trữ Monorepo trung tâm quản lý tất cả các dự án phát tri
 
 | # | Dự án | Mô tả | Công nghệ | Trạng thái |
 | :--- | :--- | :--- | :--- | :--- |
-| **02** | [**2. Tạo ví Cardano v2.0**](./2.%20Tạo%20ví%20Cardano%20v2.0/) | **Cardano Hot Wallet & Watch-Only Hub v2.0**: Ứng dụng ví nóng Cardano đa thiết bị, chạy Web PWA trực tiếp qua GitHub Pages và bộ cài Android APK (32-bit & 64-bit). Quản lý tài khoản, theo dõi số dư, staking qua Blockfrost API và xây dựng giao dịch Conway CIP-1694. | Flutter Web/Android, Rust FFI, Dart Pure | 🚀 [Chạy Web Trực Tiếp](https://sonvu91.github.io/antigravity-project/) |
-| **03+** | *Các dự án tiếp theo* | Sẽ được tự động thêm vào thư mục riêng (`3. Ten_Du_An/...`) và đồng bộ lên repository này. | Đa nền tảng | ⏳ Đang mở rộng |
+| **01** | [**1. Tạo ví Cardano**](./1.%20Tạo%20ví%20Cardano/) | **Cardano Air-Gap Dual-Wallet System v2.0.5**: Hệ thống ví kép Cardano hoàn chỉnh gồm Ví Lạnh ngoại tuyến (Cold Vault trên Samsung Galaxy J7 Prime 32-bit & ARM64) và Ví Nóng theo dõi (Hot Watch-Only Hub chạy Web PWA trực tiếp qua GitHub Pages và Android APK). Quản lý đa tài khoản, Ví Ẩn Plausible Deniability, Fast-Path Stake Guard O(1), staking qua Blockfrost API và xây dựng giao dịch Conway CIP-1694. | Flutter Web/Android, Rust FFI, Dart Pure | 🚀 [Chạy Web Trực Tiếp](https://sonvu91.github.io/antigravity-project/) |
+| **02+** | *Các dự án tiếp theo* | Sẽ được tự động thêm vào thư mục riêng (`2. Ten_Du_An/...`) và đồng bộ lên repository này. | Đa nền tảng | ⏳ Đang mở rộng |
 
 ---
 

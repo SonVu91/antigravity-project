@@ -87,6 +87,8 @@ class CardanoCoreBridge {
         if (scriptDir != null) '$scriptDir\\rust_cardano_core.dll',
         '$cwd\\rust_cardano_core\\target\\release\\rust_cardano_core.dll',
         // 3. Vị trí build artifact chính thức
+        'E:\\Antigravity\\1. Tạo ví Cardano\\rust_cardano_core.dll',
+        'E:\\ColdWallet_Build\\rust_cardano_core.dll',
         'E:\\Antigravity\\2. Tạo ví Cardano v2.0\\rust_cardano_core.dll',
         'E:\\cargo_target\\release\\rust_cardano_core.dll',
       ];

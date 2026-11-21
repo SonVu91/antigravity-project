@@ -35,6 +35,8 @@ Thumbs.db
 **/pparams.json
 
 # Flutter & Dart artifacts
+.last_build_id
+**/.last_build_id
 **/.dart_tool/
 **/.packages
 **/build/

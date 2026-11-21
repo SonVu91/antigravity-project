@@ -28,7 +28,7 @@ jobs:
 
       - name: Build Flutter Web Hot Wallet
         run: |
-          TARGET_DIR="2. Tạo ví Cardano v2.0"
+          TARGET_DIR="1. Tạo ví Cardano"
           echo "Building Web Hot Wallet in: $TARGET_DIR/mobile_online"
           cd "$TARGET_DIR/mobile_online"
           flutter pub get
@@ -41,5 +41,5 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: "2. Tạo ví Cardano v2.0/output/web_hot_wallet"
+          publish_dir: "1. Tạo ví Cardano/output/web_hot_wallet"
           enable_jekyll: false

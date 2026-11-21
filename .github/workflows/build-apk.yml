@@ -53,7 +53,7 @@ jobs:
 
       - name: Build Host Rust Cardano Core for Linux tests
         run: |
-          TARGET_DIR="2. Tạo ví Cardano v2.0"
+          TARGET_DIR="1. Tạo ví Cardano"
           cd "$TARGET_DIR/rust_cardano_core"
           cargo build --release
           cp target/release/librust_cardano_core.so ../cardano_airgap_bridge/ || true
@@ -63,28 +63,28 @@ jobs:
 
       - name: Build Rust Cardano Core for Android (arm64, armv7 32-bit, x86_64)
         run: |
-          TARGET_DIR="2. Tạo ví Cardano v2.0"
+          TARGET_DIR="1. Tạo ví Cardano"
           cd "$TARGET_DIR/rust_cardano_core"
           cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 -o ../mobile_online/android/app/src/main/jniLibs build --release
           cd ../..
 
       - name: Run Bridge Package Tests
         run: |
-          TARGET_DIR="2. Tạo ví Cardano v2.0"
+          TARGET_DIR="1. Tạo ví Cardano"
           cd "$TARGET_DIR/cardano_airgap_bridge"
           flutter pub get
           flutter test --coverage
 
       - name: Run Mobile Online (Hot) Wallet Tests
         run: |
-          TARGET_DIR="2. Tạo ví Cardano v2.0"
+          TARGET_DIR="1. Tạo ví Cardano"
           cd "$TARGET_DIR/mobile_online"
           flutter pub get
           flutter test --coverage
 
       - name: Build Mobile Online (Hot) Wallet APK (Split Per ABI & Universal)
         run: |
-          TARGET_DIR="2. Tạo ví Cardano v2.0"
+          TARGET_DIR="1. Tạo ví Cardano"
           cd "$TARGET_DIR/mobile_online"
           flutter build apk --release --split-per-abi
           flutter build apk --release
@@ -93,7 +93,7 @@ jobs:
       - name: Package & Organize APK and Web Artifacts
         run: |
           mkdir -p release-apks
-          TARGET_DIR="2. Tạo ví Cardano v2.0"
+          TARGET_DIR="1. Tạo ví Cardano"
 
           HOT_DIR="$TARGET_DIR/mobile_online/build/app/outputs/flutter-apk"
 

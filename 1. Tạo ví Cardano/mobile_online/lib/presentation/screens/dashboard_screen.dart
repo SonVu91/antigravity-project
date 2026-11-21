@@ -11,6 +11,7 @@ import 'build_tx_screen.dart';
 import 'scan_signed_screen.dart';
 import 'hot_settings_screen.dart';
 import 'withdraw_reward_screen.dart';
+import 'deregister_stake_screen.dart';
 import 'delegate_tx_screen.dart';
 import '../../core/network/stake_account_info.dart';
 import '../../core/utils/cardanoscan_helper.dart';
@@ -782,6 +783,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 ],
                               ],
                             ),
+                            if (state.stakeInfo?.isRegistered ?? state.isStakeActive) ...[
+                              const SizedBox(height: 10),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.redAccent,
+                                    side: BorderSide(color: Colors.redAccent.withOpacity(0.6)),
+                                    padding: const EdgeInsets.symmetric(vertical: 11),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  icon: const Icon(Icons.assignment_return_outlined, size: 17, color: Colors.redAccent),
+                                  label: const Text(
+                                    "HỦY STAKE & HOÀN CỌC (2 ADA)",
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.redAccent),
+                                  ),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (_) => const DeregisterStakeScreen()),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),

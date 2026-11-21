@@ -118,7 +118,41 @@ class _TxRawExportScreenState extends State<TxRawExportScreen> {
                 padding: const EdgeInsets.all(14.0),
                 child: Column(
                   children: [
-                    if (widget.builtTx.isWithdrawal) ...[
+                    if (widget.builtTx.isDeregistration) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("Hoàn cọc Stake Key:"),
+                          Text("+${widget.builtTx.depositRefundAda.toStringAsFixed(6)} ADA", style: const TextStyle(fontWeight: FontWeight.bold, color: HotTheme.safeGreen)),
+                        ],
+                      ),
+                      if (widget.builtTx.withdrawLovelace > 0) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text("Thưởng rút kèm:"),
+                            Text("+${widget.builtTx.withdrawAda.toStringAsFixed(6)} ADA", style: const TextStyle(fontWeight: FontWeight.bold, color: HotTheme.accent)),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("Phí mạng (Conway):"),
+                          Text("-${widget.builtTx.feeAda.toStringAsFixed(6)} ADA", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("Tổng nhận về đích:"),
+                          Text("${widget.builtTx.sendAda.toStringAsFixed(6)} ADA", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+                        ],
+                      ),
+                    ] else if (widget.builtTx.isWithdrawal) ...[
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [

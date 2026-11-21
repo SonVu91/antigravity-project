@@ -541,6 +541,33 @@ class HotWalletNotifier extends StateNotifier<HotWalletState> {
     return result;
   }
 
+  Future<BuiltTxResult> prepareStakeDeregistrationTransaction({String? destinationAddress}) async {
+    if (state.watchedAddress == null) {
+      throw Exception("Chưa cài đặt địa chỉ ví theo dõi.");
+    }
+    if (state.stakeAddress == null) {
+      throw Exception("Không tìm thấy địa chỉ Stake Address để hủy đăng ký.");
+    }
+
+    int? liveTtl;
+    try {
+      final slot = await _client.getLatestSlot();
+      if (slot > 0) liveTtl = slot + 7200;
+    } catch (_) {}
+
+    final result = TransactionBuilder.buildStakeDeregistrationTx(
+      senderAddress: state.watchedAddress!,
+      stakeAddress: state.stakeAddress!,
+      withdrawLovelace: state.withdrawableRewardLovelace,
+      utxos: state.utxos,
+      destinationAddress: destinationAddress,
+      ttl: liveTtl,
+    );
+
+    state = state.copyWith(lastBuiltTx: result);
+    return result;
+  }
+
   Future<BuiltTxResult> prepareTransaction({
     required String recipient,
     required double amountAda,

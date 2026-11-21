@@ -22,7 +22,7 @@ void main() {
 
       notifier.setWatchedAddress(addr1);
       expect(notifier.state.watchedAddress, equals(addr1));
-      expect(notifier.state.watchedWallets.contains(addr1), isTrue);
+      expect(notifier.state.watchedWallets.any((w) => w.address == addr1), isTrue);
 
       notifier.addWatchedWallet(addr2);
       expect(notifier.state.watchedAddress, equals(addr2));
@@ -33,7 +33,7 @@ void main() {
 
       notifier.removeWatchedWallet(addr2);
       expect(notifier.state.watchedWallets.length, equals(1));
-      expect(notifier.state.watchedWallets.contains(addr2), isFalse);
+      expect(notifier.state.watchedWallets.any((w) => w.address == addr2), isFalse);
     });
 
     test('HotWalletNotifier builds delegation transaction properly', () async {

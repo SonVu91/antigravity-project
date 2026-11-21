@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,6 +11,7 @@ import 'package:mobile_online/core/migration/hot_migration_service.dart';
 import 'package:mobile_online/core/update/hot_update_service.dart';
 import 'package:mobile_online/presentation/providers/hot_wallet_provider.dart';
 import 'package:mobile_online/presentation/screens/withdraw_reward_screen.dart';
+import 'package:mobile_online/presentation/screens/deregister_stake_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -406,6 +408,124 @@ void main() {
       expect(tx.rawCborHex.startsWith("TxBodyConwayWithdrawal:"), isTrue);
       expect(notifier.state.lastBuiltTx, isNotNull);
     });
+
+    test('Build Conway Stake Deregistration transaction with deposit refund and remaining rewards', () {
+      const senderAddr = "addr_test1qqe7la8397klhm56gnqz029da79jgz249fzemm7j2uu4st2dc8etegkawayvpf867vhs93d70gjsgdwrl88tymkq8p6qec0p73";
+      const stakeAddr = "stake_test1upxuru4u5twhwjxq5na0xtczckl85fgyxhplnn4jdmqrsaqm46y5m";
+      final mockUtxos = [
+        {
+          "tx_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
+          "tx_index": 0,
+          "amount": [
+            {"unit": "lovelace", "quantity": "5000000"} // 5 ADA
+          ]
+        }
+      ];
+
+      const withdrawLovelace = 15780000; // 15.78 ADA
+      final result = TransactionBuilder.buildStakeDeregistrationTx(
+        senderAddress: senderAddr,
+        stakeAddress: stakeAddr,
+        withdrawLovelace: withdrawLovelace,
+        utxos: mockUtxos,
+      );
+
+      expect(result.isDeregistration, isTrue);
+      expect(result.depositRefundLovelace, 2000000);
+      expect(result.depositRefundAda, 2.0);
+      expect(result.withdrawLovelace, withdrawLovelace);
+      expect(result.feeLovelace, 195000);
+      // Net send = 5,000,000 + 15,780,000 + 2,000,000 - 195,000 = 22,585,000
+      expect(result.sendLovelace, 5000000 + withdrawLovelace + 2000000 - 195000);
+      expect(result.rawCborHex.startsWith("TxBodyConwayWithdrawal:"), isTrue);
+      expect(result.inputsUsed.length, 1);
+    });
+
+    test('Build Conway Stake Deregistration transaction when reward is 0 (refund only 2 ADA deposit)', () {
+      const senderAddr = "addr_test1qqe7la8397klhm56gnqz029da79jgz249fzemm7j2uu4st2dc8etegkawayvpf867vhs93d70gjsgdwrl88tymkq8p6qec0p73";
+      const stakeAddr = "stake_test1upxuru4u5twhwjxq5na0xtczckl85fgyxhplnn4jdmqrsaqm46y5m";
+      final mockUtxos = [
+        {
+          "tx_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
+          "tx_index": 0,
+          "amount": [
+            {"unit": "lovelace", "quantity": "3000000"} // 3 ADA
+          ]
+        }
+      ];
+
+      final result = TransactionBuilder.buildStakeDeregistrationTx(
+        senderAddress: senderAddr,
+        stakeAddress: stakeAddr,
+        withdrawLovelace: 0,
+        utxos: mockUtxos,
+      );
+
+      expect(result.isDeregistration, isTrue);
+      expect(result.depositRefundLovelace, 2000000);
+      expect(result.withdrawLovelace, 0);
+      expect(result.feeLovelace, 195000);
+      // Net send = 3,000,000 + 0 + 2,000,000 - 195,000 = 4,805,000
+      expect(result.sendLovelace, 3000000 + 2000000 - 195000);
+      expect(result.rawCborHex.startsWith("TxBodyConwayWithdrawal:"), isTrue);
+    });
+
+    test('Build Conway Stake Deregistration transaction to custom destination address', () {
+      const senderAddr = "addr_test1qqe7la8397klhm56gnqz029da79jgz249fzemm7j2uu4st2dc8etegkawayvpf867vhs93d70gjsgdwrl88tymkq8p6qec0p73";
+      const stakeAddr = "stake_test1upxuru4u5twhwjxq5na0xtczckl85fgyxhplnn4jdmqrsaqm46y5m";
+      const customDest = "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3pnzms9xmg9faasgytqqr30g0055g7s63kllcfv3w56v2qae5wrx";
+      final mockUtxos = [
+        {
+          "tx_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
+          "tx_index": 0,
+          "amount": [
+            {"unit": "lovelace", "quantity": "4000000"}
+          ]
+        }
+      ];
+
+      final result = TransactionBuilder.buildStakeDeregistrationTx(
+        senderAddress: senderAddr,
+        stakeAddress: stakeAddr,
+        withdrawLovelace: 5000000,
+        utxos: mockUtxos,
+        destinationAddress: customDest,
+      );
+
+      expect(result.isDeregistration, isTrue);
+      expect(result.sendLovelace, 4000000 + 5000000 + 2000000 - 195000);
+      expect(result.rawCborHex.startsWith("TxBodyConwayWithdrawal:"), isTrue);
+    });
+
+    test('Throws error when trying to deregister stake with no UTXOs', () {
+      const senderAddr = "addr_test1qqe7la8397klhm56gnqz029da79jgz249fzemm7j2uu4st2dc8etegkawayvpf867vhs93d70gjsgdwrl88tymkq8p6qec0p73";
+      const stakeAddr = "stake_test1upxuru4u5twhwjxq5na0xtczckl85fgyxhplnn4jdmqrsaqm46y5m";
+
+      expect(
+        () => TransactionBuilder.buildStakeDeregistrationTx(
+          senderAddress: senderAddr,
+          stakeAddress: stakeAddr,
+          withdrawLovelace: 10000000,
+          utxos: [],
+        ),
+        throwsA(predicate((e) => e.toString().contains("Ví không có UTXO khả dụng để tạo giao dịch."))),
+      );
+    });
+
+    test('HotWalletNotifier prepares deregistration transaction', () async {
+      final client = BlockfrostClient(network: CardanoNetwork.preprod, allowMockFallback: true);
+      final notifier = HotWalletNotifier(client: client);
+      notifier.setWatchedAddress("addr_test1qqe7la8397klhm56gnqz029da79jgz249fzemm7j2uu4st2dc8etegkawayvpf867vhs93d70gjsgdwrl88tymkq8p6qec0p73");
+
+      await notifier.fetchBalance();
+      await notifier.fetchRewardInfo();
+
+      final tx = await notifier.prepareStakeDeregistrationTransaction();
+      expect(tx.isDeregistration, isTrue);
+      expect(tx.depositRefundLovelace, 2000000);
+      expect(tx.rawCborHex.startsWith("TxBodyConwayWithdrawal:"), isTrue);
+      expect(notifier.state.lastBuiltTx, isNotNull);
+    });
   });
 
   group('Hot Wallet UI Smoke Test', () {
@@ -418,6 +538,32 @@ void main() {
 
       await tester.pump();
       expect(find.byType(CardanoHotApp), findsOneWidget);
+    });
+
+    testWidgets('WithdrawRewardScreen renders properly', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: WithdrawRewardScreen(),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.text("Rút Thưởng Staking"), findsOneWidget);
+    });
+
+    testWidgets('DeregisterStakeScreen renders properly', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: DeregisterStakeScreen(),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.text("Hủy Stake & Hoàn Cọc"), findsOneWidget);
+      expect(find.text("CẢNH BÁO QUAN TRỌNG VỀ HỦY STAKE"), findsOneWidget);
+      expect(find.text("TỔNG DỰ KIẾN NHẬN VỀ"), findsOneWidget);
     });
   });
 }

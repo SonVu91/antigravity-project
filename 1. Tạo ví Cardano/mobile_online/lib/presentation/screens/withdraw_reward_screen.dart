@@ -49,6 +49,8 @@ class _WithdrawRewardScreenState extends ConsumerState<WithdrawRewardScreen> {
         destinationAddress: _useCustomAddress ? targetDestination : null,
       );
 
+      if (!mounted) return;
+
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -56,7 +58,9 @@ class _WithdrawRewardScreenState extends ConsumerState<WithdrawRewardScreen> {
         ),
       );
     } catch (e) {
-      setState(() => _errorMessage = e.toString());
+      if (mounted) {
+        setState(() => _errorMessage = e.toString());
+      }
     }
   }
 
@@ -64,7 +68,6 @@ class _WithdrawRewardScreenState extends ConsumerState<WithdrawRewardScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(hotWalletProvider);
     const int estimatedFeeLovelace = 195000;
-    const double estimatedFeeAda = estimatedFeeLovelace / 1000000.0;
     final int netReceiveLovelace = (state.withdrawableRewardLovelace > estimatedFeeLovelace)
         ? (state.withdrawableRewardLovelace - estimatedFeeLovelace)
         : 0;

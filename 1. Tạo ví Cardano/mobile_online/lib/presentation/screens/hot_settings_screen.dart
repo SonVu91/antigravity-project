@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import '../../core/network/blockfrost_client.dart';
 import '../../core/theme/hot_theme.dart';
 import '../../core/migration/hot_migration_service.dart';
 import '../../core/update/hot_update_service.dart';

@@ -50,6 +50,8 @@ class BuiltTxResult {
   final List<TokenTransferItem> changeTokens;
   final int withdrawLovelace;
   final int depositLovelace;
+  final int depositRefundLovelace;
+  final bool isDeregistration;
   final String? delegatedPoolId;
   final String? delegatedDRepId;
 
@@ -63,6 +65,8 @@ class BuiltTxResult {
     this.changeTokens = const [],
     this.withdrawLovelace = 0,
     this.depositLovelace = 0,
+    this.depositRefundLovelace = 0,
+    this.isDeregistration = false,
     this.delegatedPoolId,
     this.delegatedDRepId,
   });
@@ -72,8 +76,9 @@ class BuiltTxResult {
   double get changeAda => changeLovelace / 1000000.0;
   double get withdrawAda => withdrawLovelace / 1000000.0;
   double get depositAda => depositLovelace / 1000000.0;
+  double get depositRefundAda => depositRefundLovelace / 1000000.0;
   bool get hasTokens => sentTokens.isNotEmpty;
-  bool get isWithdrawal => withdrawLovelace > 0;
+  bool get isWithdrawal => withdrawLovelace > 0 && !isDeregistration;
   bool get isDelegation => delegatedPoolId != null || delegatedDRepId != null;
 }
 
@@ -318,7 +323,7 @@ class TransactionBuilder {
     // Gồm 1 input, 1 output, 1 withdrawal entry và 2 chữ ký xác thực (Payment VKey + Stake VKey)
     // Kích thước ước tính ~390 bytes -> fee = 44 * 390 + 155381 = ~172,541 Lovelace.
     // Thêm biên độ an toàn Conway: 195,000 Lovelace (~0.195 ADA).
-    final int estimatedFee = 195000;
+    const int estimatedFee = 195000;
 
     if (withdrawLovelace <= estimatedFee) {
       throw Exception(
@@ -372,6 +377,92 @@ class TransactionBuilder {
     );
   }
 
+  /// Xây dựng giao dịch Hủy Stake & Thu hồi Cọc (Deregister Stake Key Conway)
+  /// Thu hồi 2 ADA tiền cọc + tự động rút toàn bộ phần thưởng (nếu có)
+  static BuiltTxResult buildStakeDeregistrationTx({
+    required String senderAddress,
+    required String stakeAddress,
+    required int withdrawLovelace,
+    required List<Map<String, dynamic>> utxos,
+    String? destinationAddress,
+    int? ttl,
+  }) {
+    if (utxos.isEmpty) {
+      throw Exception("Ví không có UTXO khả dụng để tạo giao dịch.");
+    }
+
+    final targetDestination = (destinationAddress != null && destinationAddress.trim().isNotEmpty)
+        ? destinationAddress.trim()
+        : senderAddress;
+
+    const int depositRefundLovelace = 2000000; // 2 ADA hoàn cọc
+    const int estimatedFee = 195000; // Phí mạng Conway ước tính
+
+    // Chọn 1 UTXO nhỏ nhất để làm input mồi
+    final sortedUtxos = List<Map<String, dynamic>>.from(utxos);
+    sortedUtxos.sort((a, b) {
+      final qA = int.parse(a['amount'][0]['quantity']);
+      final qB = int.parse(b['amount'][0]['quantity']);
+      return qA.compareTo(qB);
+    });
+
+    final selectedInput = sortedUtxos.first;
+    final inputLovelace = int.parse(selectedInput['amount'][0]['quantity']);
+    final inputsUsed = ["${selectedInput['tx_hash']}#${selectedInput['tx_index']}"];
+
+    // Giữ lại các token có trong UTXO input nếu có
+    final returnedTokens = <TokenTransferItem>[];
+    final amounts = selectedInput['amount'] as List<dynamic>? ?? [];
+    for (final a in amounts) {
+      final unit = a['unit'] as String;
+      final q = BigInt.tryParse(a['quantity'].toString()) ?? BigInt.zero;
+      if (unit != 'lovelace' && q > BigInt.zero) {
+        returnedTokens.add(TokenTransferItem(
+          asset: TokenAsset.fromUnit(unit: unit, quantity: q),
+          sendQuantity: q,
+        ));
+      }
+    }
+
+    // Công thức cân bằng ngân sách:
+    // Tổng vào (Inputs + Withdrawals + DepositRefund) = Tổng ra (Outputs + Fee)
+    final int safeWithdraw = withdrawLovelace > 0 ? withdrawLovelace : 0;
+    final int outputLovelace = inputLovelace + safeWithdraw + depositRefundLovelace - estimatedFee;
+
+    if (outputLovelace < 1000000) {
+      throw Exception("Số dư sau khi hoàn cọc và trừ phí không đủ mức tối thiểu 1 ADA (Min-UTXO).");
+    }
+
+    final buffer = StringBuffer();
+    buffer.write("TxBodyConwayWithdrawal:");
+
+    final hexPayload = _generateConwayDeregistrationCborHex(
+      selectedInputs: [selectedInput],
+      destinationAddress: targetDestination,
+      outputLovelace: outputLovelace,
+      outputTokens: returnedTokens,
+      stakeAddress: stakeAddress,
+      withdrawLovelace: safeWithdraw,
+      depositRefundLovelace: depositRefundLovelace,
+      fee: estimatedFee,
+      ttl: ttl ?? calculateDefaultTtl(),
+    );
+
+    buffer.write(hexPayload);
+
+    return BuiltTxResult(
+      rawCborHex: buffer.toString(),
+      feeLovelace: estimatedFee,
+      sendLovelace: outputLovelace,
+      changeLovelace: 0,
+      inputsUsed: inputsUsed,
+      sentTokens: returnedTokens,
+      withdrawLovelace: safeWithdraw,
+      depositRefundLovelace: depositRefundLovelace,
+      isDeregistration: true,
+    );
+  }
+
   /// Xây dựng giao dịch Ủy thác Conway (Stake Pool, DRep hoặc Cả Hai)
   static BuiltTxResult buildDelegationTx({
     required String senderAddress,
@@ -395,7 +486,7 @@ class TransactionBuilder {
     }
 
     final int depositLovelace = isStakeKeyRegistered ? 0 : 2000000;
-    final int estimatedFee = 195000;
+    const int estimatedFee = 195000;
     final int requiredLovelace = depositLovelace + estimatedFee + minPureAdaChangeLovelace;
 
     final selectedInputs = <Map<String, dynamic>>[];
@@ -693,6 +784,106 @@ class TransactionBuilder {
     }
     _writeCborByteString(bytes, validStakeBytes);
     _writeCborUint(bytes, withdrawLovelace);
+
+    return hex.encode(bytes);
+  }
+
+  static String _generateConwayDeregistrationCborHex({
+    required List<Map<String, dynamic>> selectedInputs,
+    required String destinationAddress,
+    required int outputLovelace,
+    required List<TokenTransferItem> outputTokens,
+    required String stakeAddress,
+    required int withdrawLovelace,
+    required int depositRefundLovelace,
+    required int fee,
+    required int ttl,
+  }) {
+    final List<int> bytes = [];
+
+    // Số phần tử trong Map Transaction Body Conway:
+    // keys: 0 (inputs), 1 (outputs), 2 (fee), 3 (ttl), 4 (certs)
+    // Nếu có withdrawLovelace > 0: thêm key 5 (withdrawals) -> mapSize = 6
+    final int mapSize = withdrawLovelace > 0 ? 6 : 5;
+    _writeCborMapHeader(bytes, mapSize);
+
+    // Key 0: inputs
+    bytes.add(0x00);
+    _writeCborArrayHeader(bytes, selectedInputs.length);
+    for (final inp in selectedInputs) {
+      bytes.add(0x82); // array of 2 [tx_hash, index]
+      bytes.add(0x58);
+      bytes.add(0x20); // 32 bytes
+      final hashStr = (inp['tx_hash'] as String).padRight(64, '0').substring(0, 64);
+      bytes.addAll(hex.decode(hashStr));
+      _writeCborUint(bytes, (inp['tx_index'] as num).toInt());
+    }
+
+    // Key 1: outputs (1 output duy nhất chuyển toàn bộ về địa chỉ đích)
+    bytes.add(0x01);
+    _writeCborArrayHeader(bytes, 1);
+    _writeOutputEntry(
+      bytes: bytes,
+      address: destinationAddress,
+      lovelace: outputLovelace,
+      tokens: outputTokens,
+    );
+
+    // Key 2: fee
+    bytes.add(0x02);
+    _writeCborUint(bytes, fee);
+
+    // Key 3: ttl
+    bytes.add(0x03);
+    _writeCborUint(bytes, ttl);
+
+    // Key 4: certs (Chứa chứng chỉ UnregCert Tag 8 kèm deposit hoàn lại)
+    bytes.add(0x04);
+    _writeCborArrayHeader(bytes, 1);
+
+    // Trích xuất 28 bytes stake credential hash
+    List<int> stakeCred = [];
+    final decodedStake = CardanoAddressHelper.decodeBech32(stakeAddress);
+    if (decodedStake != null && (decodedStake['bytes'] as List<int>).length == 29) {
+      stakeCred = (decodedStake['bytes'] as List<int>).sublist(1);
+    } else {
+      final derived = CardanoAddressHelper.deriveStakeAddress(destinationAddress);
+      if (derived != null) {
+        final dec = CardanoAddressHelper.decodeBech32(derived);
+        if (dec != null) stakeCred = (dec['bytes'] as List<int>).sublist(1);
+      }
+    }
+    if (stakeCred.length != 28) {
+      throw Exception("Không thể trích xuất Stake Credential (28 bytes) từ địa chỉ ví: $stakeAddress");
+    }
+
+    // UnregCert (Type 8): [8, [0, stakeCred], deposit]
+    bytes.add(0x83); // array 3
+    bytes.add(0x08); // Type 8: UnregCert
+    bytes.add(0x82); // Array 2: StakeCredential (KeyHash)
+    bytes.add(0x00);
+    bytes.add(0x58);
+    bytes.add(0x1c); // 28 bytes
+    bytes.addAll(stakeCred);
+    _writeCborUint(bytes, depositRefundLovelace);
+
+    // Key 5: withdrawals (nếu có rút thưởng)
+    if (withdrawLovelace > 0) {
+      bytes.add(0x05);
+      _writeCborMapHeader(bytes, 1);
+      final rawStakeBytes = _addressToBechBytes(stakeAddress);
+      final validStakeBytes = rawStakeBytes.length == 29
+          ? rawStakeBytes
+          : (rawStakeBytes.length > 29
+              ? rawStakeBytes.sublist(0, 29)
+              : [...rawStakeBytes, ...List<int>.filled(29 - rawStakeBytes.length, 0)]);
+      if (validStakeBytes[0] != 0xe0 && validStakeBytes[0] != 0xe1) {
+        final isMainnet = stakeAddress.startsWith("stake1");
+        validStakeBytes[0] = isMainnet ? 0xe1 : 0xe0;
+      }
+      _writeCborByteString(bytes, validStakeBytes);
+      _writeCborUint(bytes, withdrawLovelace);
+    }
 
     return hex.encode(bytes);
   }

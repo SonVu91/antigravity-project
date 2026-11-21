@@ -217,9 +217,26 @@ impl TransactionParser {
                             svrd.deposit as f64 / 1_000_000.0
                         ));
                     }
-                    Certificate::StakeDeregistration(_) | Certificate::UnregCert(_) => {
-                        has_unauthorized_cert = true;
-                        certificates_summary.push("CẢNH BÁO: Hủy đăng ký Khóa Stake (StakeDeregistration/UnregCert)".to_string());
+                    Certificate::UnregCert(unreg) => {
+                        if let Some(ref expected_hash) = expected_stake_hash {
+                            if unreg.stake_credential != cml_chain::certs::StakeCredential::new_pub_key(*expected_hash) {
+                                is_change_safe = false;
+                                security_warnings.push("SECURITY_ALERT_UNAUTHORIZED_CERTIFICATE: Chứng chỉ Hủy đăng ký Stake Key không thuộc ví của bạn!".to_string());
+                            }
+                        }
+                        certificates_summary.push(format!(
+                            "Hủy đăng ký Khóa Stake Conway (UnregCert - Thu hồi cọc: {:.2} ADA)",
+                            unreg.deposit as f64 / 1_000_000.0
+                        ));
+                    }
+                    Certificate::StakeDeregistration(sdr) => {
+                        if let Some(ref expected_hash) = expected_stake_hash {
+                            if sdr.stake_credential != cml_chain::certs::StakeCredential::new_pub_key(*expected_hash) {
+                                is_change_safe = false;
+                                security_warnings.push("SECURITY_ALERT_UNAUTHORIZED_CERTIFICATE: Chứng chỉ Hủy đăng ký Stake Key không thuộc ví của bạn!".to_string());
+                            }
+                        }
+                        certificates_summary.push("Hủy đăng ký Khóa Stake (StakeDeregistration - Thu hồi cọc: 2.00 ADA)".to_string());
                     }
                     _ => {
                         has_unauthorized_cert = true;
@@ -290,7 +307,7 @@ impl TransactionParser {
         if has_unauthorized_cert {
             is_change_safe = false;
             security_warnings.push(
-                "SECURITY_ALERT_BLIND_SIGNING: Giao dịch chứa chứng chỉ Hủy đăng ký khóa Stake hoặc chứng chỉ lạ!".to_string(),
+                "SECURITY_ALERT_BLIND_SIGNING: Giao dịch chứa chứng chỉ lạ hoặc không được cấp phép!".to_string(),
             );
         }
         if tx_body.collateral_inputs.is_some() || tx_body.collateral_return.is_some() || tx_body.total_collateral.is_some() {

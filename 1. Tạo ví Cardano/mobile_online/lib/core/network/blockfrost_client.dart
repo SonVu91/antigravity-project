@@ -388,7 +388,7 @@ class BlockfrostClient {
   }
 
   static String formatSubmitError(String raw) {
-    if (raw.contains("OutsideValidityIntervalUTxO")) {
+    if (raw.contains("OutsideValidityIntervalUTxO") || raw.contains("ExpiredTxUTxO")) {
       return "Thời hạn hiệu lực của giao dịch (TTL) đã hết hạn so với slot hiện tại của mạng Cardano.\n\n"
           "Khắc phục: Hệ thống đã tự động tính toán lại TTL theo thời gian thực (hiệu lực 2 giờ). Vui lòng tạo lại giao dịch mới từ Ví Nóng và ký lại từ Ví Lạnh.";
     }
@@ -406,6 +406,13 @@ class BlockfrostClient {
     }
     if (raw.contains("ValueNotConservedUTxO")) {
       return "Số dư đầu vào không khớp với tổng tiền gửi + tiền thừa + phí mạng.";
+    }
+    if (raw.contains("MissingVKeyWitnessesUTXOW")) {
+      return "Giao dịch thiếu chữ ký xác thực (Witness) từ Ví Lạnh!\n\n"
+          "Khắc phục: Giao dịch này yêu cầu cơ chế ký kép (Payment Key + Stake Key). Vui lòng đảm bảo bạn đã dùng đúng Ví Lạnh và bản cập nhật v2.0.7 để ký giao dịch.";
+    }
+    if (raw.contains("FeeTooSmallUTxO")) {
+      return "Mức phí giao dịch nhỏ hơn phí tối thiểu yêu cầu bởi giao thức Cardano Conway.";
     }
 
     try {

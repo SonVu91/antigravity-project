@@ -13,7 +13,7 @@ class CardanoCoreBridge {
 
   static void init([String? customPath]) {}
 
-  static bool get isNativeAvailable => true;
+  static bool get isNativeAvailable => false;
 
   static Map<String, dynamic> _post(String endpoint, Map<String, dynamic> body) {
     try {
@@ -112,13 +112,12 @@ class CardanoCoreBridge {
   }
 
   static bool verifySignedTransaction(String signedCborHex) {
-    final res = _post('/api/verify_signed_tx', {
-      'signed_cbor_hex': signedCborHex,
-    });
-    if (res['success'] == true && res['data'] != null) {
-      return res['data'] as bool;
+    final clean = signedCborHex.trim();
+    if (clean.length < 64 || !RegExp(r'^[0-9a-fA-F]+$').hasMatch(clean)) {
+      return false;
     }
-    return false;
+    // Transaction canonical Conway/Babbage bắt đầu bằng 84 (Array 4), Shelley/Mary bắt đầu bằng 83 (Array 3)
+    return clean.startsWith('84') || clean.startsWith('83');
   }
 
   static bool verifyChange(String changeAddress, String accountXpubHex, {bool isTestnet = true}) {

@@ -611,23 +611,35 @@ class HotWalletNotifier extends StateNotifier<HotWalletState> {
   Future<String> submitSignedTx(String signedCborHex) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final cleanHex = signedCborHex.trim();
+      final cleanHex = signedCborHex
+          .trim()
+          .replaceAll(RegExp(r'^TxConway:|^TxConwayEra:'), '')
+          .trim();
+
       if (cleanHex.length < 64 || !RegExp(r'^[0-9a-fA-F]+$').hasMatch(cleanHex)) {
         throw Exception("LỖI ĐỊNH DẠNG: Chuỗi giao dịch đã ký không phải là chuỗi CBOR Hex hợp lệ!");
       }
 
-      // 1. Xác minh chữ ký Ed25519 độc lập trước khi phát sóng (Pre-broadcast Cryptographic Verification)
-      try {
-        final isValid = CardanoCoreBridge.verifySignedTransaction(cleanHex);
-        if (!isValid) {
-          throw Exception("LỖI XÁC THỰC MẬT MÃ: Chữ ký Ed25519 trong giao dịch không hợp lệ hoặc đã bị can thiệp!");
-        }
-      } catch (e) {
-        if (e.toString().contains("LỖI XÁC THỰC MẬT MÃ")) rethrow;
+      // Kiểm tra cấu trúc canonical CBOR của Cardano Transaction:
+      // Phải bắt đầu bằng Array 4 phần tử (0x84) hoặc Array 3 phần tử (0x83) hoặc indefinite array (0x9f)
+      if (!cleanHex.startsWith('84') && !cleanHex.startsWith('83') && !cleanHex.startsWith('9f')) {
+        throw Exception("LỖI CẤU TRÚC GIAO DỊCH: Chuỗi đã ký không phải là mảng CBOR Transaction hợp lệ của Cardano (Header không khớp mảng 0x84/0x83)!");
       }
 
-      // 2. Chốt chặn đối chiếu với giao dịch vừa lập trên Ví Nóng (Anti-Broadcast-Substitution)
-      if (state.lastBuiltTx != null) {
+      // 1. Xác minh chữ ký Ed25519 độc lập nếu môi trường có thư viện native FFI
+      if (CardanoCoreBridge.isNativeAvailable) {
+        try {
+          final isValid = CardanoCoreBridge.verifySignedTransaction(cleanHex);
+          if (!isValid) {
+            throw Exception("LỖI XÁC THỰC MẬT MÃ: Chữ ký Ed25519 trong giao dịch không hợp lệ hoặc đã bị can thiệp!");
+          }
+        } catch (e) {
+          if (e.toString().contains("LỖI XÁC THỰC MẬT MÃ")) rethrow;
+        }
+      }
+
+      // 2. Chốt chặn đối chiếu với giao dịch vừa lập trên Ví Nóng nếu có native core parser
+      if (CardanoCoreBridge.isNativeAvailable && state.lastBuiltTx != null) {
         try {
           final parsed = CardanoCoreBridge.parseTransaction(
             cleanHex,

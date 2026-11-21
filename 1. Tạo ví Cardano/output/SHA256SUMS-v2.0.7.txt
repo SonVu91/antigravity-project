@@ -1,4 +1,9 @@
-﻿521f5afe79bd4c22eacf12e72117c433f8fa20d5aa4e1fe666271d6ff2ddd978  cardano-cold-wallet-v2.0.7-armv7.apk
-43184dcf8c132e34b8843712a82cb4bc7a239c72666408bf3bf6e7c4740bb920  cardano-cold-wallet-v2.0.7-arm64.apk
+﻿43184dcf8c132e34b8843712a82cb4bc7a239c72666408bf3bf6e7c4740bb920  cardano-cold-wallet-v2.0.7-arm64.apk
+521f5afe79bd4c22eacf12e72117c433f8fa20d5aa4e1fe666271d6ff2ddd978  cardano-cold-wallet-v2.0.7-armv7.apk
 a188e665a014a46edff8eafb8b1d29226ba87aed722eb21a52ffaf6353b2adb9  cardano-cold-wallet-v2.0.7-universal.apk
 a188e665a014a46edff8eafb8b1d29226ba87aed722eb21a52ffaf6353b2adb9  cardano-cold-wallet-v2.0.7.apk
+11e636587c7041e0e6beec35ff52f14e80ce30b53fbcc467bfc39743c57e9113  cardano-hot-wallet-v2.0.7-arm64.apk
+65bdaba2538658ab731ac18a27ca869a99dca51710142debbfc3c2d8ddec18b8  cardano-hot-wallet-v2.0.7-armv7.apk
+f03de7d9b6035651408b83be1a94f4392af54feead36e5cee97159fc0889dfc0  cardano-hot-wallet-v2.0.7-universal.apk
+f03de7d9b6035651408b83be1a94f4392af54feead36e5cee97159fc0889dfc0  cardano-hot-wallet-v2.0.7.apk
+a25538bf3db9274b50bf88c338cd71add619f0aa87c166bdcf58017d8652e6e3  cardano-hot-wallet-web-v2.0.7.zip

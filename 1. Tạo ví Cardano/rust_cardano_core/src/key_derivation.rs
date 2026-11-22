@@ -110,6 +110,11 @@ impl KeyDerivator {
         Ok(account.derive(1).derive(index))
     }
 
+    /// Dẫn xuất Khóa DRep (Governance Key CIP-1694) tại m/1852'/1815'/account'/3/index
+    pub fn derive_drep_key(account: &Bip32PrivateKey, index: u32) -> Result<Bip32PrivateKey, String> {
+        Ok(account.derive(3).derive(index))
+    }
+
     /// Tạo địa chỉ thanh toán Base Address (Bech32) từ Payment vkey và Stake vkey
     pub fn build_base_address(
         payment_vkey: &Bip32PublicKey,

@@ -131,6 +131,81 @@ class BlockfrostClient {
     }
   }
 
+  /// Lấy toàn bộ các địa chỉ (nhánh 0/x và 1/x) thuộc về tài khoản Stake
+  Future<List<String>> getAccountAddresses(String stakeAddress) async {
+    final url = Uri.parse("$baseUrl/accounts/$stakeAddress/addresses");
+    try {
+      final response = await http.get(url, headers: _headers);
+      if (response.statusCode == 200) {
+        final List<dynamic> list = jsonDecode(response.body);
+        return list.map((e) => (e as Map<String, dynamic>)['address'] as String).toList();
+      } else if (response.statusCode == 404) {
+        return [];
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  /// Lấy toàn bộ UTXO thuộc mọi nhánh địa chỉ của tài khoản (Gom UTXO đa nhánh)
+  Future<List<Map<String, dynamic>>> getAllAccountUtxos(String paymentAddress, {String? stakeAddress}) async {
+    final Set<String> addressesToQuery = {paymentAddress};
+    
+    // Nếu có stakeAddress, truy vấn toàn bộ các địa chỉ nhánh từ Blockfrost
+    final effStake = stakeAddress ?? CardanoAddressHelper.deriveStakeAddress(paymentAddress);
+    if (effStake != null && effStake.isNotEmpty) {
+      final branchAddrs = await getAccountAddresses(effStake);
+      addressesToQuery.addAll(branchAddrs);
+    }
+
+    if (addressesToQuery.length <= 1) {
+      return await getUtxos(paymentAddress);
+    }
+
+    // Quét song song UTXO trên tất cả các địa chỉ nhánh
+    final futures = addressesToQuery.map((addr) async {
+      try {
+        final utxos = await getUtxos(addr);
+        return utxos.map((u) {
+          final copy = Map<String, dynamic>.from(u);
+          copy['source_address'] = addr;
+          return copy;
+        }).toList();
+      } catch (_) {
+        return <Map<String, dynamic>>[];
+      }
+    });
+
+    final results = await Future.wait(futures);
+    final List<Map<String, dynamic>> allUtxos = [];
+    final Set<String> seenUtxoKeys = {};
+
+    for (final list in results) {
+      for (final u in list) {
+        final key = "${u['tx_hash']}#${u['tx_index']}";
+        if (!seenUtxoKeys.contains(key)) {
+          seenUtxoKeys.add(key);
+          allUtxos.add(u);
+        }
+      }
+    }
+
+    if (allUtxos.isEmpty && allowMockFallback) {
+      return await getUtxos(paymentAddress);
+    }
+
+    return allUtxos;
+  }
+
+  /// Kiểm tra xem Stake Address đã được ủy thác DRep (CIP-1694) chưa
+  Future<String?> getAccountDRepId(String stakeAddress) async {
+    final info = await getAccountInfo(stakeAddress);
+    if (info != null && info['drep_id'] != null) {
+      final drep = info['drep_id'].toString().trim();
+      return drep.isNotEmpty ? drep : null;
+    }
+    return null;
+  }
+
   Future<Map<String, dynamic>?> getAssetMetadata(String assetUnit) async {
     if (_assetMetadataCache.containsKey(assetUnit)) {
       return _assetMetadataCache[assetUnit];

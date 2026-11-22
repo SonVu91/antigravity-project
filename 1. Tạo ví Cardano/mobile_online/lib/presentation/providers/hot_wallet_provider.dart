@@ -323,7 +323,8 @@ class HotWalletNotifier extends StateNotifier<HotWalletState> {
       final updatedList = <WatchedWalletEntry>[];
       for (final w in state.watchedWallets) {
         try {
-          final utxos = await _client.getUtxos(w.address);
+          final derivedStake = CardanoAddressHelper.deriveStakeAddress(w.address);
+          final utxos = await _client.getAllAccountUtxos(w.address, stakeAddress: derivedStake);
           int love = 0;
           for (final u in utxos) {
             final amounts = u['amount'] as List<dynamic>? ?? [];
@@ -360,7 +361,7 @@ class HotWalletNotifier extends StateNotifier<HotWalletState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      final utxos = await _client.getUtxos(addr);
+      final utxos = await _client.getAllAccountUtxos(addr, stakeAddress: state.stakeAddress);
       int totalLove = 0;
       final Map<String, BigInt> tokenTotals = {};
 
@@ -528,6 +529,8 @@ class HotWalletNotifier extends StateNotifier<HotWalletState> {
       if (slot > 0) liveTtl = slot + 7200;
     } catch (_) {}
 
+    final bool isDRepDelegated = state.stakeInfo?.isDelegatedToDRep ?? false;
+
     final result = TransactionBuilder.buildRewardWithdrawalTx(
       senderAddress: state.watchedAddress!,
       stakeAddress: state.stakeAddress!,
@@ -535,6 +538,8 @@ class HotWalletNotifier extends StateNotifier<HotWalletState> {
       utxos: state.utxos,
       destinationAddress: destinationAddress,
       ttl: liveTtl,
+      autoDelegateDRep: !isDRepDelegated,
+      drepId: "always_abstain",
     );
 
     state = state.copyWith(lastBuiltTx: result);

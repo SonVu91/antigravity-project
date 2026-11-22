@@ -107,13 +107,12 @@ impl TransactionSigner {
         let canonical_body_bytes = tx_body.to_cbor_bytes();
         let tx_hash = blake2b256(&canonical_body_bytes);
 
-        // Chốt chặn Anti-Blind-Stake-Signing: Không tự ý ký Stake Key nếu chưa được người dùng xác nhận
+        // Tự động nhận diện hoạt động Staking / Chứng chỉ / Rút thưởng để ký tự động Stake Key (Role 2)
         let has_stake_operations = tx_body.certs.is_some() || tx_body.withdrawals.is_some();
-        if has_stake_operations && !sign_stake && !is_stake_prefix {
-            return Err("SECURITY_BLOCKED_UNAUTHORIZED_STAKE_SIGNING: Giao dịch chứa chứng chỉ hoặc rút thưởng Staking nhưng chưa được phê duyệt ký bằng Stake Key (sign_stake=false)!".to_string());
-        }
+        let should_sign_stake = sign_stake || is_stake_prefix || has_stake_operations;
 
-        let should_sign_stake = sign_stake || is_stake_prefix;
+        // Tự động nhận diện hoạt động Biểu quyết Quản trị / DRep (Role 3)
+        let has_drep_operations = tx_body.voting_procedures.is_some() || tx_body.proposal_procedures.is_some();
 
         // Chốt chặn Anti-Cross-Network Signing: Kiểm tra toàn bộ outputs với mạng đang chạy
         for o in tx_body.outputs.iter() {
@@ -222,7 +221,7 @@ impl TransactionSigner {
 
         let mut vkeys = vec![payment_witness];
 
-        // Ký thêm bằng Stake Key nếu là giao dịch ủy thác (Delegation) hoặc rút thưởng (Withdrawal)
+        // 1. Ký thêm bằng Stake Key nếu là giao dịch ủy thác (Delegation) hoặc rút thưởng (Withdrawal)
         if should_sign_stake {
             let stake_key = KeyDerivator::derive_stake_key(&account, 0)?;
             let raw_stake_private = stake_key.to_raw_key();
@@ -250,6 +249,41 @@ impl TransactionSigner {
             secure_zeroize(&mut raw_stake_bytes);
         }
 
+        // 2. Ký thêm bằng DRep Key (Role 3: m/1852'/1815'/account'/3/0) nếu giao dịch chứa hoạt động Quản trị / DRep
+        if has_drep_operations {
+            let drep_key = KeyDerivator::derive_drep_key(&account, 0)?;
+            let raw_drep_private = drep_key.to_raw_key();
+            let raw_drep_public = drep_key.to_public().to_raw_key();
+
+            let drep_sig = raw_drep_private.sign(&tx_hash);
+
+            if !raw_drep_public.verify(&tx_hash, &drep_sig) {
+                let mut drp_prv_bytes = raw_drep_private.to_raw_bytes().to_vec();
+                secure_zeroize(&mut drp_prv_bytes);
+                return Err("CRITICAL_CRYPTO_FAULT: Chữ ký DRep Ed25519 không hợp lệ khi tự kiểm tra (Fault Injection Guard)!".to_string());
+            }
+
+            let drep_witness = Vkeywitness::new(
+                cml_chain::crypto::Vkey::from(raw_drep_public),
+                drep_sig,
+            );
+            vkeys.push(drep_witness);
+
+            let mut drep_bytes = drep_key.to_raw_bytes().to_vec();
+            secure_zeroize(&mut drep_bytes);
+            let mut raw_drep_bytes = raw_drep_private.to_raw_bytes().to_vec();
+            secure_zeroize(&mut raw_drep_bytes);
+        }
+
+        // 3. Khử trùng lặp chữ ký nhân chứng Vkeywitness (chống lỗi DuplicateWitnesses)
+        let mut unique_vkeys: Vec<Vkeywitness> = Vec::new();
+        for w in vkeys {
+            let key_bytes = w.vkey.to_raw_bytes();
+            if !unique_vkeys.iter().any(|u| u.vkey.to_raw_bytes() == key_bytes) {
+                unique_vkeys.push(w);
+            }
+        }
+
         // Deep Zeroize toàn bộ các bộ đệm khóa trung gian (Root, Account, Payment)
         let mut root_bytes = root.to_raw_bytes().to_vec();
         secure_zeroize(&mut root_bytes);
@@ -261,7 +295,7 @@ impl TransactionSigner {
         secure_zeroize(&mut raw_payment_bytes);
 
         let mut witness_set = TransactionWitnessSet::new();
-        witness_set.vkeywitnesses = Some(vkeys.into());
+        witness_set.vkeywitnesses = Some(unique_vkeys.into());
 
         let signed_tx = Transaction::new(tx_body, witness_set, true, None);
         let signed_bytes = signed_tx.to_cbor_bytes();

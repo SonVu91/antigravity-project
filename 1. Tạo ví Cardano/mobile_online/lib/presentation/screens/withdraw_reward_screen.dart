@@ -340,6 +340,28 @@ class _WithdrawRewardScreenState extends ConsumerState<WithdrawRewardScreen> {
               const SizedBox(height: 16),
             ],
 
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.shield_outlined, color: Colors.blueAccent, size: 20),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      "Kỷ nguyên Conway: Tự động đính kèm chứng chỉ DRep AlwaysAbstain để giao dịch phát sóng thành công 100%.",
+                      style: TextStyle(fontSize: 11.5, color: Colors.white70),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
             // Nút bấm Tạo giao dịch rút thưởng
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(

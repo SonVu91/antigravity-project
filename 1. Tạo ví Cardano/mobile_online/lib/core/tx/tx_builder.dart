@@ -300,6 +300,7 @@ class TransactionBuilder {
 
   /// Xây dựng giao dịch Rút thưởng Staking Conway hoàn chỉnh
   /// Bắt buộc: 1 UTXO input theo luật Cardano Ledger, 1 withdrawal, và 1 output nhận thưởng
+  /// Tự động tích hợp chứng chỉ VoteDelegation (AlwaysAbstain) vào Key 4 để vượt qua chốt chặn ConwayWdrlNotDelegatedToDRep
   static BuiltTxResult buildRewardWithdrawalTx({
     required String senderAddress,
     required String stakeAddress,
@@ -307,6 +308,8 @@ class TransactionBuilder {
     required List<Map<String, dynamic>> utxos,
     String? destinationAddress,
     int? ttl,
+    bool autoDelegateDRep = true,
+    String drepId = "always_abstain",
   }) {
     if (utxos.isEmpty) {
       throw Exception("Ví không có UTXO khả dụng để làm input khởi tạo giao dịch.");
@@ -320,9 +323,9 @@ class TransactionBuilder {
         : senderAddress;
 
     // Phí ước tính cho giao dịch Conway rút thưởng:
-    // Gồm 1 input, 1 output, 1 withdrawal entry và 2 chữ ký xác thực (Payment VKey + Stake VKey)
-    // Kích thước ước tính ~390 bytes -> fee = 44 * 390 + 155381 = ~172,541 Lovelace.
-    // Thêm biên độ an toàn Conway: 195,000 Lovelace (~0.195 ADA).
+    // Gồm 1 input, 1 output, 1 withdrawal entry, chứng chỉ DRep và chữ ký xác thực
+    // Kích thước ước tính ~430 bytes -> fee = 44 * 430 + 155381 = ~174,301 Lovelace.
+    // Biên độ an toàn Conway: 195,000 Lovelace (~0.195 ADA).
     const int estimatedFee = 195000;
 
     if (withdrawLovelace <= estimatedFee) {
@@ -346,8 +349,6 @@ class TransactionBuilder {
     // Công thức cân bằng ngân sách giao dịch:
     // Tổng vào (Inputs + Withdrawals) = Tổng ra (Outputs + Fee)
     // Phí được khấu trừ trực tiếp vào tiền thưởng:
-    // netWithdrawal = withdrawLovelace - estimatedFee;
-    // Output chuyển về đích = inputLovelace + netWithdrawal;
     final int netWithdrawal = withdrawLovelace - estimatedFee;
     final int outputLovelace = inputLovelace + netWithdrawal;
 
@@ -363,6 +364,8 @@ class TransactionBuilder {
       withdrawLovelace: withdrawLovelace,
       fee: estimatedFee,
       ttl: ttl ?? calculateDefaultTtl(),
+      includeDRepDelegation: autoDelegateDRep,
+      drepId: drepId,
     );
 
     buffer.write(hexPayload);
@@ -374,6 +377,7 @@ class TransactionBuilder {
       changeLovelace: 0,
       inputsUsed: inputsUsed,
       withdrawLovelace: withdrawLovelace,
+      delegatedDRepId: autoDelegateDRep ? drepId : null,
     );
   }
 
@@ -733,11 +737,22 @@ class TransactionBuilder {
     required int withdrawLovelace,
     required int fee,
     required int ttl,
+    bool includeDRepDelegation = true,
+    String drepId = "always_abstain",
   }) {
     final List<int> bytes = [];
 
-    // Map of 5 elements: a5 (inputs:0, outputs:1, fee:2, ttl:3, withdrawals:5)
-    bytes.add(0xa5);
+    // Trích xuất 28 bytes stake credential hash
+    List<int> stakeCred = [];
+    final decodedStake = CardanoAddressHelper.decodeBech32(stakeAddress);
+    if (decodedStake != null && (decodedStake['bytes'] as List<int>).length == 29) {
+      stakeCred = (decodedStake['bytes'] as List<int>).sublist(1);
+    }
+    final bool canIncludeDRep = includeDRepDelegation && stakeCred.length == 28;
+
+    // Map size: 6 nếu kèm certs (Key 4: VoteDelegCert), 5 nếu không kèm
+    final int mapSize = canIncludeDRep ? 6 : 5;
+    _writeCborMapHeader(bytes, mapSize);
 
     // Key 0: inputs
     bytes.add(0x00);
@@ -768,6 +783,35 @@ class TransactionBuilder {
     // Key 3: ttl
     bytes.add(0x03);
     _writeCborUint(bytes, ttl);
+
+    // Key 4: certs (Nếu có ủy thác DRep để vượt qua chốt chặn ConwayWdrlNotDelegatedToDRep)
+    if (canIncludeDRep) {
+      bytes.add(0x04);
+      _writeCborArrayHeader(bytes, 1);
+
+      List<int> drepBytes = [];
+      if (drepId == "always_no_confidence" || drepId == "drep_always_no_confidence") {
+        drepBytes = [0x81, 0x03]; // [3]
+      } else if (drepId == "always_abstain" || drepId == "drep_always_abstain") {
+        drepBytes = [0x81, 0x02]; // [2]
+      } else {
+        final dHash = CardanoAddressHelper.drepIdToBytes(drepId);
+        if (dHash != null && dHash.length == 28) {
+          drepBytes = [0x82, 0x00, 0x58, 0x1c, ...dHash];
+        } else {
+          drepBytes = [0x81, 0x02]; // Fallback always_abstain
+        }
+      }
+
+      // Certificate Type 9: VoteDelegCert [9, stakeCred, drepBytes]
+      final voteDelegCert = <int>[
+        0x83, // Array 3
+        0x09, // Type 9 (VoteDelegCert)
+        0x82, 0x00, 0x58, 0x1c, ...stakeCred,
+        ...drepBytes,
+      ];
+      bytes.addAll(voteDelegCert);
+    }
 
     // Key 5: withdrawals (Map từ Stake Address -> Lovelace)
     bytes.add(0x05);

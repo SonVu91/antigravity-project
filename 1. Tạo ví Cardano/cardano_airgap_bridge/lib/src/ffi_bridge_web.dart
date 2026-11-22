@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:html' as html;
 import 'models.dart';
+import 'bip39_pure.dart';
 
 class CardanoCoreBridge {
   static String get _serviceUrl {
@@ -44,6 +45,19 @@ class CardanoCoreBridge {
     }
     return false;
   }
+
+  /// Kiểm tra một từ riêng lẻ có thuộc từ điển BIP-39 hay không
+  static bool isWordValid(String word) => Bip39Pure.isWordValid(word);
+
+  /// Trích xuất danh sách các từ bị sai (không thuộc BIP-39) từ chuỗi phrase
+  static List<String> findInvalidWords(String phrase) => Bip39Pure.findInvalidWords(phrase);
+
+  /// Lấy danh sách gợi ý từ nhanh dựa trên tiền tố (prefix) đang gõ
+  static List<String> getSuggestions(String prefix, {int limit = 6}) => Bip39Pure.getSuggestions(prefix, limit: limit);
+
+  /// Gợi ý từ đúng gần giống nhất cho từ gõ sai
+  static String? suggestClosestWord(String invalidWord) => Bip39Pure.suggestClosestWord(invalidWord);
+
 
   static WalletKeysInfo createWallet(
     String phrase, {

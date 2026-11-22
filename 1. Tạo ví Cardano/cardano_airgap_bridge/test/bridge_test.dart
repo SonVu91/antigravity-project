@@ -21,6 +21,23 @@ void main() {
       expect(CardanoCoreBridge.validateMnemonic('invalid mnemonic word list that fails checksum'), isFalse);
     });
 
+    test('BIP-39 Word Validation & Autocomplete Suggestions', () {
+      expect(CardanoCoreBridge.isWordValid('abandon'), isTrue);
+      expect(CardanoCoreBridge.isWordValid('glag'), isFalse);
+      expect(CardanoCoreBridge.isWordValid('glad'), isTrue);
+
+      final invalidWords = CardanoCoreBridge.findInvalidWords('iron scout tenant giggle glory manual glag skull');
+      expect(invalidWords, equals(['glag']));
+
+      final suggestions = CardanoCoreBridge.getSuggestions('gla');
+      expect(suggestions, contains('glad'));
+      expect(suggestions, contains('glass'));
+
+      final closest = CardanoCoreBridge.suggestClosestWord('glag');
+      expect(closest, isNotNull);
+      expect(closest == 'glad' || closest == 'flag' || closest == 'glass', isTrue);
+    });
+
     test('Create Wallet CIP-1852 (BIP-39 Seed)', () {
       const phrase = 'test walk nut penalty hip pave soap entry language right filter choice';
       final wallet = CardanoCoreBridge.createWallet(phrase, isTestnet: true, accountIndex: 0, addressIndex: 0);

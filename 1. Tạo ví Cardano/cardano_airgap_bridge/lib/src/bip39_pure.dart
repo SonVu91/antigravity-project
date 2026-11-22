@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -2060,6 +2059,86 @@ class Bip39Pure {
   static final Map<String, int> _wordMap = {
     for (int i = 0; i < wordList.length; i++) wordList[i]: i,
   };
+
+  /// Kiểm tra một từ riêng lẻ có thuộc từ điển BIP-39 hay không
+  static bool isWordValid(String word) {
+    final clean = word.trim().toLowerCase();
+    return clean.isNotEmpty && _wordMap.containsKey(clean);
+  }
+
+  /// Trích xuất danh sách các từ bị sai (không thuộc BIP-39) từ chuỗi phrase
+  static List<String> findInvalidWords(String phrase) {
+    final words = phrase.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    final invalid = <String>[];
+    for (final w in words) {
+      if (!isWordValid(w)) {
+        invalid.add(w);
+      }
+    }
+    return invalid;
+  }
+
+  /// Lấy danh sách gợi ý từ nhanh dựa trên tiền tố (prefix) đang gõ (tối đa [limit] từ)
+  static List<String> getSuggestions(String prefix, {int limit = 6}) {
+    final clean = prefix.trim().toLowerCase();
+    if (clean.isEmpty) return const [];
+    final results = <String>[];
+    for (final w in wordList) {
+      if (w.startsWith(clean)) {
+        results.add(w);
+        if (results.length >= limit) break;
+      }
+    }
+    return results;
+  }
+
+  /// Gợi ý từ đúng gần giống nhất cho từ gõ sai bằng khoảng cách Levenshtein
+  static String? suggestClosestWord(String invalidWord) {
+    final clean = invalidWord.trim().toLowerCase();
+    if (clean.isEmpty) return null;
+
+    // 1. Thử tìm từ bắt đầu bằng tiền tố rút gọn
+    if (clean.length >= 3) {
+      final prefixMatches = getSuggestions(clean.substring(0, clean.length - 1), limit: 1);
+      if (prefixMatches.isNotEmpty) return prefixMatches.first;
+    }
+
+    // 2. Tìm từ có khoảng cách Levenshtein nhỏ nhất (tối đa 2)
+    int bestDist = 3;
+    String? bestWord;
+    for (final w in wordList) {
+      if ((w.length - clean.length).abs() > 2) continue;
+      final dist = _levenshtein(clean, w);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestWord = w;
+        if (dist == 1) break;
+      }
+    }
+    return bestWord;
+  }
+
+  static int _levenshtein(String s, String t) {
+    if (s == t) return 0;
+    if (s.isEmpty) return t.length;
+    if (t.isEmpty) return s.length;
+
+    List<int> v0 = List<int>.generate(t.length + 1, (i) => i);
+    List<int> v1 = List<int>.filled(t.length + 1, 0);
+
+    for (int i = 0; i < s.length; i++) {
+      v1[0] = i + 1;
+      for (int j = 0; j < t.length; j++) {
+        final cost = (s.codeUnitAt(i) == t.codeUnitAt(j)) ? 0 : 1;
+        v1[j + 1] = min(v1[j] + 1, min(v0[j + 1] + 1, v0[j] + cost));
+      }
+      for (int j = 0; j <= t.length; j++) {
+        v0[j] = v1[j];
+      }
+    }
+    return v0[t.length];
+  }
+
 
   /// Sinh cụm từ khôi phục BIP-39 chuẩn (12, 15, hoặc 24 từ) bằng CSPRNG phần cứng
   static String generateMnemonic(int wordCount) {

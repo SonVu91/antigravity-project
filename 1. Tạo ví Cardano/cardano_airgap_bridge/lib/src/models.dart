@@ -53,6 +53,7 @@ class WalletKeysInfo {
   final int accountIndex;
   final int addressIndex;
   final String derivationPath;
+  final bool useIcarus;
 
   WalletKeysInfo({
     required this.mnemonic,
@@ -62,6 +63,7 @@ class WalletKeysInfo {
     this.accountIndex = 0,
     this.addressIndex = 0,
     this.derivationPath = "m/1852'/1815'/0'/0/0",
+    this.useIcarus = false,
   });
 
   factory WalletKeysInfo.fromJson(Map<String, dynamic> json) {
@@ -75,6 +77,7 @@ class WalletKeysInfo {
       accountIndex: accIdx,
       addressIndex: addrIdx,
       derivationPath: json['derivation_path'] as String? ?? "m/1852'/1815'/$accIdx'/0/$addrIdx",
+      useIcarus: json['use_icarus'] as bool? ?? false,
     );
   }
 
@@ -86,6 +89,7 @@ class WalletKeysInfo {
     'account_index': accountIndex,
     'address_index': addressIndex,
     'derivation_path': derivationPath,
+    'use_icarus': useIcarus,
   };
 }
 

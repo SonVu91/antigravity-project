@@ -38,9 +38,10 @@ Mỗi khi người dùng bắt đầu một phiên làm việc mới trên bất
 2. **Trong quá trình làm việc:**
    * Phát triển mã nguồn, viết tài liệu và kiểm thử tuân thủ các quy tắc chất lượng cao.
    * Khi tạo dự án mới, luôn đặt trong một thư mục con được đánh số thứ tự (ví dụ: `2. Tên Dự Án`).
-3. **Kết thúc phiên làm việc:**
-   * Trợ lý AI nhắc nhở hoặc hỗ trợ người dùng chạy `sync_push.bat` để gom toàn bộ thay đổi, tạo commit có thông điệp rõ ràng theo chuẩn Semantic Commit (`feat:`, `fix:`, `docs:`, `chore:`) và đẩy lên GitHub.
-   * Nhờ đó, khi người dùng sang máy tính khác, dữ liệu luôn ở trạng thái mới nhất.
+3. **Kết thúc phiên làm việc & Đóng gói phát hành (Auto-Push Protocol):**
+   * **Tự động đẩy khi đóng gói phát hành:** Mỗi khi hoàn tất việc kiểm thử và đóng gói một phiên bản mới (Release), Trợ lý AI tự động cập nhật bản build Web PWA (với `<base href="/antigravity-project/">`), tạo commit chuẩn Semantic Commit (`release: ...`) và tự động đẩy (`git push origin main`) lên GitHub để người dùng có thể sử dụng ngay trên điện thoại và đồng bộ đa máy.
+   * Ngoài ra, kết thúc mỗi phiên làm việc, hỗ trợ người dùng chạy `sync_push.bat` để gom toàn bộ thay đổi còn lại.
+   * Nhờ đó, khi người dùng sang máy tính khác hoặc mở điện thoại, dữ liệu luôn ở trạng thái mới nhất.
 
 ---
 

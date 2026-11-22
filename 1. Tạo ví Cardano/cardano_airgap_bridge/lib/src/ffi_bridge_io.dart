@@ -188,7 +188,9 @@ class CardanoCoreBridge {
 
       final map = jsonDecode(jsonStr);
       if (map['success'] == true) {
-        return WalletKeysInfo.fromJson(map['data'] as Map<String, dynamic>);
+        final data = Map<String, dynamic>.from(map['data'] as Map);
+        data['use_icarus'] = useIcarus;
+        return WalletKeysInfo.fromJson(data);
       } else {
         throw Exception(map['error']);
       }

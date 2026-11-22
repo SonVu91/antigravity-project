@@ -17,8 +17,14 @@ class CardanoPure {
     int addressIndex = 0,
     bool useIcarus = false,
   }) {
-    final seed = _mnemonicToSeed(phrase, passphrase);
-    final rootKey = _deriveRootKey(seed);
+    final Uint8List rootKey;
+    if (useIcarus) {
+      final entropy = Bip39Pure.mnemonicToEntropy(phrase);
+      rootKey = _deriveRootKeyIcarus(entropy, passphrase);
+    } else {
+      final seed = _mnemonicToSeed(phrase, passphrase);
+      rootKey = _deriveRootKey(seed);
+    }
 
     final accountKey = _deriveAccountKey(rootKey, accountIndex);
     final paymentKey = _derivePaymentKey(accountKey, addressIndex);
@@ -44,7 +50,26 @@ class CardanoPure {
       accountIndex: accountIndex,
       addressIndex: addressIndex,
       derivationPath: derivationPath,
+      useIcarus: useIcarus,
     );
+  }
+
+  /// Dẫn xuất Root Master Key trực tiếp từ Raw Entropy theo chuẩn CIP-0003 (Icarus / Yoroi)
+  static Uint8List _deriveRootKeyIcarus(Uint8List entropy, String passphrase) {
+    final salt = entropy;
+    final password = utf8.encode(passphrase);
+    final pbkdf2Output = _pbkdf2HmacSha512(password, salt, 4096, 96);
+
+    final kL = Uint8List.fromList(pbkdf2Output.sublist(0, 32));
+    final kR = Uint8List.fromList(pbkdf2Output.sublist(32, 64));
+    final chainCode = pbkdf2Output.sublist(64, 96);
+
+    // Clamping Ed25519
+    kL[0] &= 248;
+    kL[31] &= 127;
+    kL[31] |= 64;
+
+    return Uint8List.fromList([...kL, ...kR, ...chainCode]);
   }
 
   /// PBKDF2-HMAC-SHA512: 2048 vòng lặp tạo 64-byte seed

@@ -287,13 +287,13 @@
         var pBox = document.getElementById("qr-progress-box");
         if (pBox) pBox.style.display = "none";
 
-        // Chờ 150ms để trình duyệt hoàn tất CSS layout reflow cho modal flexbox
+        // Chá» 150ms Ä‘á»ƒ trÃ¬nh duyá»‡t hoÃ n táº¥t CSS layout reflow cho modal flexbox
         await new Promise(function(r) { setTimeout(r, 150); });
 
-        // Vòng đời sạch: Giải phóng an toàn instance cũ nếu có
+        // VÃ²ng Ä‘á»i sáº¡ch: Giáº£i phÃ³ng an toÃ n instance cÅ© náº¿u cÃ³
         await window.CardanoWebQrScanner._cleanExistingScanner();
 
-        // Tạo mới instance scanner với Native BarcodeDetector
+        // Táº¡o má»›i instance scanner vá»›i Native BarcodeDetector
         try {
           window.CardanoWebQrScanner.html5QrCode = new Html5Qrcode("qr-reader", {
             experimentalFeatures: {
@@ -305,7 +305,7 @@
           console.warn("Could not create Html5Qrcode instance:", e);
         }
 
-        // Cấu hình quét độ nét cao (Full HD / HD) để giải quyết QR có logo hoặc mật độ dày
+        // Cáº¥u hÃ¬nh quÃ©t Ä‘á»™ nÃ©t cao (Full HD / HD) Ä‘á»ƒ giáº£i quyáº¿t QR cÃ³ logo hoáº·c máº­t Ä‘á»™ dÃ y
         var config = {
           fps: 30,
           qrbox: function(viewfinderWidth, viewfinderHeight) {
@@ -322,13 +322,13 @@
           }
         };
 
-        // Quét danh sách thiết bị camera vật lý để tìm camera sau tối ưu
+        // QuÃ©t danh sÃ¡ch thiáº¿t bá»‹ camera váº­t lÃ½ Ä‘á»ƒ tÃ¬m camera sau tá»‘i Æ°u
         var cameraConfig = { facingMode: "environment" };
         try {
           var cameras = await Html5Qrcode.getCameras();
           if (cameras && cameras.length > 0) {
             window.CardanoWebQrScanner.availableCameras = cameras;
-            // Tìm camera sau (back / rear / sau / environment)
+            // TÃ¬m camera sau (back / rear / sau / environment)
             var backIdx = -1;
             for (var i = 0; i < cameras.length; i++) {
               var lbl = (cameras[i].label || "").toLowerCase();
@@ -349,18 +349,18 @@
           console.warn("Html5Qrcode.getCameras() skipped or failed:", e);
         }
 
-        // Bắt đầu khởi động Camera với cơ chế tự động thử lại (Fallback)
+        // Báº¯t Ä‘áº§u khá»Ÿi Ä‘á»™ng Camera vá»›i cÆ¡ cháº¿ tá»± Ä‘á»™ng thá»­ láº¡i (Fallback)
         try {
           await window.CardanoWebQrScanner._attemptStart(cameraConfig, config);
         } catch (firstErr) {
           console.warn("First camera attempt failed, trying fallback:", firstErr);
           try {
-            // Fallback 1: Thử lại với facingMode "environment"
+            // Fallback 1: Thá»­ láº¡i vá»›i facingMode "environment"
             await window.CardanoWebQrScanner._attemptStart({ facingMode: "environment" }, config);
           } catch (secErr) {
             console.warn("Fallback 1 failed, trying fallback 2 (any video):", secErr);
             try {
-              // Fallback 2: Thử bất kỳ camera nào khả dụng
+              // Fallback 2: Thá»­ báº¥t ká»³ camera nÃ o kháº£ dá»¥ng
               await window.CardanoWebQrScanner._attemptStart({ facingMode: "user" }, config);
             } catch (finalErr) {
               console.error("All camera start attempts failed:", finalErr);
@@ -394,7 +394,7 @@
             window.CardanoWebQrScanner.isScanning = true;
             var loading = document.getElementById("qr-loading-overlay");
             if (loading) loading.style.display = "none";
-            // Cưỡng bức các thuộc tính mobile video: playsinline, autoplay, muted
+            // CÆ°á»¡ng bá»©c cÃ¡c thuá»™c tÃ­nh mobile video: playsinline, autoplay, muted
             try {
               var v = document.querySelector("#qr-reader video");
               if (v) {
@@ -437,18 +437,18 @@
       switchCamera: async function() {
         var cams = window.CardanoWebQrScanner.availableCameras;
         if (!cams || cams.length < 2) {
-          // Nếu chưa có danh sách hoặc chỉ 1 camera, reload thử tìm camera khác
+          // Náº¿u chÆ°a cÃ³ danh sÃ¡ch hoáº·c chá»‰ 1 camera, reload thá»­ tÃ¬m camera khÃ¡c
           try {
             var fresh = await Html5Qrcode.getCameras();
             if (fresh && fresh.length > 1) {
               window.CardanoWebQrScanner.availableCameras = fresh;
               cams = fresh;
             } else {
-              alert("Thiết bị của bạn chỉ có 1 camera hoặc không phát hiện camera phụ.");
+              alert("Thiáº¿t bá»‹ cá»§a báº¡n chá»‰ cÃ³ 1 camera hoáº·c khÃ´ng phÃ¡t hiá»‡n camera phá»¥.");
               return;
             }
           } catch (e) {
-            alert("Không thể chuyển đổi camera trên thiết bị này.");
+            alert("KhÃ´ng thá»ƒ chuyá»ƒn Ä‘á»•i camera trÃªn thiáº¿t bá»‹ nÃ y.");
             return;
           }
         }
@@ -493,7 +493,7 @@
         if (loading) {
           loading.style.display = "flex";
           var txt = loading.querySelector("div:last-child");
-          if (txt) txt.innerText = "Đang quét mã QR từ hình ảnh...";
+          if (txt) txt.innerText = "Äang quÃ©t mÃ£ QR tá»« hÃ¬nh áº£nh...";
         }
 
         try {
@@ -514,7 +514,7 @@
           }
         } catch (err) {
           if (loading) loading.style.display = "none";
-          alert("Không phát hiện mã QR hợp lệ trong ảnh: " + (err || "Vui lòng chọn ảnh chụp rõ nét hơn."));
+          alert("KhÃ´ng phÃ¡t hiá»‡n mÃ£ QR há»£p lá»‡ trong áº£nh: " + (err || "Vui lÃ²ng chá»n áº£nh chá»¥p rÃµ nÃ©t hÆ¡n."));
         } finally {
           var inp = document.getElementById("qr-file-input");
           if (inp) inp.value = "";
@@ -530,8 +530,8 @@
         if (errBox) {
           errBox.style.display = "flex";
           if (errMsg) {
-            errMsg.innerHTML = "<b>Không thể mở Camera:</b> " + (err || "Trình duyệt chặn quyền truy cập.") + 
-              "<br><br><small style='color:#94a3b8;'>Lưu ý: iOS Safari và Chrome yêu cầu cho phép quyền Camera trong Cài đặt trang web hoặc mở qua HTTPS.</small>";
+            errMsg.innerHTML = "<b>KhÃ´ng thá»ƒ má»Ÿ Camera:</b> " + (err || "TrÃ¬nh duyá»‡t cháº·n quyá»n truy cáº­p.") + 
+              "<br><br><small style='color:#94a3b8;'>LÆ°u Ã½: iOS Safari vÃ  Chrome yÃªu cáº§u cho phÃ©p quyá»n Camera trong CÃ i Ä‘áº·t trang web hoáº·c má»Ÿ qua HTTPS.</small>";
           }
         }
       },
@@ -543,7 +543,7 @@
         if (pBox && total > 1) {
           pBox.style.display = "block";
           var pct = Math.min(100, Math.round((received * 100) / total));
-          if (pText) pText.innerText = received + " / " + total + " mảnh (" + pct + "%)";
+          if (pText) pText.innerText = received + " / " + total + " máº£nh (" + pct + "%)";
           if (pFill) pFill.style.width = pct + "%";
         }
       },
@@ -568,43 +568,43 @@
   </script>
 </head>
 <body>
-  <!-- Modal Quét Live Camera Web -->
+  <!-- Modal QuÃ©t Live Camera Web -->
   <div id="qr-scanner-modal">
     <div class="qr-modal-header">
       <div class="qr-modal-title">
-        <span>📷 Quét Mã QR (Air-Gap Scanner)</span>
+        <span>ðŸ“· QuÃ©t MÃ£ QR (Air-Gap Scanner)</span>
       </div>
       <div class="qr-header-actions">
         <input type="file" id="qr-file-input" accept="image/*" style="display: none;" onchange="window.CardanoWebQrScanner.scanImageFile(this.files[0])">
-        <button class="qr-modal-btn-action" onclick="document.getElementById('qr-file-input').click()" title="Tải ảnh QR từ thư viện máy">
-          <span>🖼️</span> Tải Ảnh
+        <button class="qr-modal-btn-action" onclick="document.getElementById('qr-file-input').click()" title="Táº£i áº£nh QR tá»« thÆ° viá»‡n mÃ¡y">
+          <span>ðŸ–¼ï¸</span> Táº£i áº¢nh
         </button>
-        <button class="qr-modal-btn-action" onclick="window.CardanoWebQrScanner.switchCamera()" title="Đổi camera trước / sau">
-          <span>🔄</span> Đổi Cam
+        <button class="qr-modal-btn-action" onclick="window.CardanoWebQrScanner.switchCamera()" title="Äá»•i camera trÆ°á»›c / sau">
+          <span>ðŸ”„</span> Äá»•i Cam
         </button>
-        <button class="qr-modal-btn-close" onclick="window.CardanoWebQrScanner.stopCamera()">✕ Đóng</button>
+        <button class="qr-modal-btn-close" onclick="window.CardanoWebQrScanner.stopCamera()">âœ• ÄÃ³ng</button>
       </div>
     </div>
     
     <div id="qr-reader-container">
       <div id="qr-reader"></div>
 
-      <!-- Trạng thái chờ kết nối camera -->
+      <!-- Tráº¡ng thÃ¡i chá» káº¿t ná»‘i camera -->
       <div id="qr-loading-overlay">
         <div class="qr-spinner"></div>
-        <div>Đang kết nối Camera...</div>
+        <div>Äang káº¿t ná»‘i Camera...</div>
       </div>
 
-      <!-- Trạng thái lỗi và nút Thử Lại -->
+      <!-- Tráº¡ng thÃ¡i lá»—i vÃ  nÃºt Thá»­ Láº¡i -->
       <div id="qr-error-overlay">
-        <div style="font-size: 32px; margin-bottom: 8px;">⚠️</div>
+        <div style="font-size: 32px; margin-bottom: 8px;">âš ï¸</div>
         <div id="qr-error-message" style="font-size: 13px; line-height: 1.5; margin-bottom: 16px;"></div>
         <div style="display: flex; gap: 10px;">
           <button class="qr-modal-btn-action" style="border-color: #ff6b00;" onclick="window.CardanoWebQrScanner.startCamera()">
-            <span>🔄</span> Thử Lại
+            <span>ðŸ”„</span> Thá»­ Láº¡i
           </button>
           <button class="qr-modal-btn-close" onclick="window.CardanoWebQrScanner.stopCamera()">
-            ✕ Đóng
+            âœ• ÄÃ³ng
           </button>
         </div>
       </div>
@@ -612,15 +612,15 @@
 
     <div id="qr-progress-box">
       <div class="qr-progress-row">
-        <span>Tiến độ quét QR Động:</span>
-        <span id="qr-progress-text" style="color: #ff6b00;">0 / 0 mảnh (0%)</span>
+        <span>Tiáº¿n Ä‘á»™ quÃ©t QR Äá»™ng:</span>
+        <span id="qr-progress-text" style="color: #ff6b00;">0 / 0 máº£nh (0%)</span>
       </div>
       <div class="qr-progress-bar-bg">
         <div id="qr-progress-bar-fill"></div>
       </div>
     </div>
     <div class="qr-modal-tip">
-      Hướng camera về phía mã QR (giữ khoảng cách 15-20cm để lấy nét rõ).<br>Hỗ trợ QR tĩnh, QR có logo và QR động nhiều mảnh (UR). Nếu quét màn hình bị chói, bạn có thể nhấn <b>Tải Ảnh</b> để chọn ảnh chụp màn hình.
+      HÆ°á»›ng camera vá» phÃ­a mÃ£ QR (giá»¯ khoáº£ng cÃ¡ch 15-20cm Ä‘á»ƒ láº¥y nÃ©t rÃµ).<br>Há»— trá»£ QR tÄ©nh, QR cÃ³ logo vÃ  QR Ä‘á»™ng nhiá»u máº£nh (UR). Náº¿u quÃ©t mÃ n hÃ¬nh bá»‹ chÃ³i, báº¡n cÃ³ thá»ƒ nháº¥n <b>Táº£i áº¢nh</b> Ä‘á»ƒ chá»n áº£nh chá»¥p mÃ n hÃ¬nh.
     </div>
   </div>
 

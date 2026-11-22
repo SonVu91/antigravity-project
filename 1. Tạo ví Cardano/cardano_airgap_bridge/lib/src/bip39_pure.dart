@@ -2137,6 +2137,33 @@ class Bip39Pure {
     return actualChecksumStr == expectedChecksumStr;
   }
 
+  /// Trích xuất Raw Entropy (16/20/32 bytes) từ cụm từ Mnemonic BIP-39
+  static Uint8List mnemonicToEntropy(String phrase) {
+    final words = phrase.trim().split(RegExp(r'\s+'));
+    if (words.length != 12 && words.length != 15 && words.length != 24) {
+      throw ArgumentError('Mnemonic phải có 12, 15 hoặc 24 từ.');
+    }
+
+    final bitBuffer = StringBuffer();
+    for (final w in words) {
+      final idx = _wordMap[w.toLowerCase()];
+      if (idx == null) throw ArgumentError('Từ không hợp lệ trong từ điển BIP-39: $w');
+      bitBuffer.write(idx.toRadixString(2).padLeft(11, '0'));
+    }
+
+    final bits = bitBuffer.toString();
+    final checksumBitsLen = words.length ~/ 3;
+    final entropyBitsLen = bits.length - checksumBitsLen;
+
+    final entropyBytes = Uint8List(entropyBitsLen ~/ 8);
+    for (int i = 0; i < entropyBytes.length; i++) {
+      final chunk = bits.substring(i * 8, (i + 1) * 8);
+      entropyBytes[i] = int.parse(chunk, radix: 2);
+    }
+
+    return entropyBytes;
+  }
+
   /// Pure-Dart SHA-256 (FIPS 180-4 standard)
   static Uint8List _sha256(Uint8List data) {
     const k = [

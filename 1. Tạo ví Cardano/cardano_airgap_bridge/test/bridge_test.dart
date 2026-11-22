@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cardano_airgap_bridge/cardano_airgap_bridge.dart';
+import 'package:cardano_airgap_bridge/src/cardano_pure.dart';
 
 void main() {
   setUpAll(() {
@@ -43,6 +44,27 @@ void main() {
       expect(walletBip39.paymentAddress.startsWith('addr_test1'), isTrue);
       expect(walletIcarus.paymentAddress.startsWith('addr_test1'), isTrue);
       expect(walletBip39.paymentAddress, isNot(equals(walletIcarus.paymentAddress)));
+      expect(walletIcarus.useIcarus, isTrue);
+      expect(walletBip39.useIcarus, isFalse);
+    });
+
+    test('15-word Yoroi CIP-0003 Icarus wallet derivation', () {
+      // 15 words standard Yoroi mnemonic
+      final phrase15 = CardanoCoreBridge.generateMnemonic(15);
+      expect(phrase15.split(' ').length, 15);
+
+      final walletMainnetIcarus = CardanoCoreBridge.createWallet(phrase15, isTestnet: false, useIcarus: true);
+      final walletMainnetBip39 = CardanoCoreBridge.createWallet(phrase15, isTestnet: false, useIcarus: false);
+
+      expect(walletMainnetIcarus.paymentAddress.startsWith('addr1'), isTrue);
+      expect(walletMainnetBip39.paymentAddress.startsWith('addr1'), isTrue);
+      expect(walletMainnetIcarus.paymentAddress, isNot(equals(walletMainnetBip39.paymentAddress)));
+      expect(walletMainnetIcarus.useIcarus, isTrue);
+
+      // Verify Pure-Dart parity
+      final pureWallet = CardanoPure.createWallet(phrase15, isTestnet: false, useIcarus: true);
+      expect(pureWallet.paymentAddress.startsWith('addr1'), isTrue);
+      expect(pureWallet.useIcarus, isTrue);
     });
 
     test('Change Guard verification', () {

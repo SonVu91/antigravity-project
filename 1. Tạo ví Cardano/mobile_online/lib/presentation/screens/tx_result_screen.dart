@@ -23,7 +23,9 @@ class TxResultScreen extends ConsumerWidget {
           preferredSize: const Size.fromHeight(24),
           child: Padding(
             padding: const EdgeInsets.only(bottom: 8.0),
-            child: HotTheme.buildLiveNetworkBadge(),
+            child: HotTheme.buildLiveNetworkBadge(
+              networkName: network.name.toUpperCase(),
+            ),
           ),
         ),
       ),

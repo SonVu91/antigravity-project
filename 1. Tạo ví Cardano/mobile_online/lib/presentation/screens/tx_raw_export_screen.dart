@@ -1,22 +1,24 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:cardano_airgap_bridge/cardano_airgap_bridge.dart';
 import '../../core/theme/hot_theme.dart';
 import '../../core/tx/tx_builder.dart';
+import '../providers/hot_wallet_provider.dart';
 import 'scan_signed_screen.dart';
 
-class TxRawExportScreen extends StatefulWidget {
+class TxRawExportScreen extends ConsumerStatefulWidget {
   final BuiltTxResult builtTx;
 
   const TxRawExportScreen({super.key, required this.builtTx});
 
   @override
-  State<TxRawExportScreen> createState() => _TxRawExportScreenState();
+  ConsumerState<TxRawExportScreen> createState() => _TxRawExportScreenState();
 }
 
-class _TxRawExportScreenState extends State<TxRawExportScreen> {
+class _TxRawExportScreenState extends ConsumerState<TxRawExportScreen> {
   late List<String> _qrFrames;
   int _currentFrame = 0;
   Timer? _animationTimer;
@@ -48,6 +50,7 @@ class _TxRawExportScreenState extends State<TxRawExportScreen> {
   Widget build(BuildContext context) {
     final currentPayload = _qrFrames[_currentFrame];
     final isAnimated = _qrFrames.length > 1;
+    final network = ref.watch(hotWalletProvider).network;
 
     return Scaffold(
       appBar: AppBar(
@@ -56,7 +59,9 @@ class _TxRawExportScreenState extends State<TxRawExportScreen> {
           preferredSize: const Size.fromHeight(24),
           child: Padding(
             padding: const EdgeInsets.only(bottom: 8.0),
-            child: HotTheme.buildLiveNetworkBadge(),
+            child: HotTheme.buildLiveNetworkBadge(
+              networkName: network.name.toUpperCase(),
+            ),
           ),
         ),
       ),

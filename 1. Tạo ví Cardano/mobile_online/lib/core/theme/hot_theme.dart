@@ -67,7 +67,7 @@ class HotTheme {
     );
   }
 
-  static Widget buildLiveNetworkBadge({String networkName = "PREPROD TESTNET", VoidCallback? onTap}) {
+  static Widget buildLiveNetworkBadge({required String networkName, VoidCallback? onTap}) {
     final isMainnet = networkName.toUpperCase().contains("MAINNET");
     final dotColor = isMainnet ? safeGreen : accent;
 

@@ -9,6 +9,10 @@ import 'package:mobile_online/presentation/providers/hot_wallet_provider.dart';
 import 'package:mobile_online/presentation/screens/dashboard_screen.dart';
 import 'package:mobile_online/presentation/screens/build_tx_screen.dart';
 import 'package:mobile_online/presentation/screens/scan_signed_screen.dart';
+import 'package:mobile_online/presentation/screens/tx_raw_export_screen.dart';
+import 'package:mobile_online/presentation/screens/tx_result_screen.dart';
+import 'package:mobile_online/core/network/blockfrost_client.dart';
+import 'package:mobile_online/core/tx/tx_builder.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -130,6 +134,84 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.textContaining("Bước 3/3: Quét Giao Dịch Đã Ký (txSigned) & Phát Sóng"), findsOneWidget);
+    });
+
+    testWidgets('4. All transaction flow screens preserve active network badge (Mainnet / Preprod)', (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'hot_cardano_network': 'mainnet',
+      });
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final notifier = container.read(hotWalletProvider.notifier);
+      await notifier.switchNetwork(CardanoNetwork.mainnet);
+      await tester.pumpAndSettle();
+
+      // 1. BuildTxScreen displays MAINNET
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: HotTheme.darkTheme,
+            home: const BuildTxScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text("VÍ TRỰC TUYẾN - MAINNET"), findsOneWidget);
+      expect(find.text("VÍ TRỰC TUYẾN - PREPROD TESTNET"), findsNothing);
+
+      // 2. TxRawExportScreen displays MAINNET
+      final dummyTx = BuiltTxResult(
+        rawCborHex: "84a30081825820000100a000a0",
+        feeLovelace: 180000,
+        sendLovelace: 10000000,
+        changeLovelace: 5000000,
+        inputsUsed: const [],
+        sentTokens: const [],
+        changeTokens: const [],
+      );
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: HotTheme.darkTheme,
+            home: TxRawExportScreen(builtTx: dummyTx),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text("VÍ TRỰC TUYẾN - MAINNET"), findsOneWidget);
+      expect(find.text("VÍ TRỰC TUYẾN - PREPROD TESTNET"), findsNothing);
+
+      // 3. ScanSignedScreen displays MAINNET
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: HotTheme.darkTheme,
+            home: const ScanSignedScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text("VÍ TRỰC TUYẾN - MAINNET"), findsOneWidget);
+      expect(find.text("VÍ TRỰC TUYẾN - PREPROD TESTNET"), findsNothing);
+
+      // 4. TxResultScreen displays MAINNET
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: HotTheme.darkTheme,
+            home: const TxResultScreen(txId: "abcdef1234567890"),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text("VÍ TRỰC TUYẾN - MAINNET"), findsOneWidget);
+      expect(find.text("VÍ TRỰC TUYẾN - PREPROD TESTNET"), findsNothing);
     });
   });
 }

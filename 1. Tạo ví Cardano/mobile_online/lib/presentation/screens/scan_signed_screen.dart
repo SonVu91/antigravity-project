@@ -90,6 +90,8 @@ class _ScanSignedScreenState extends ConsumerState<ScanSignedScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final network = ref.watch(hotWalletProvider).network;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Tiếp Nhận Giao Dịch Đã Ký"),
@@ -97,7 +99,9 @@ class _ScanSignedScreenState extends ConsumerState<ScanSignedScreen> {
           preferredSize: const Size.fromHeight(24),
           child: Padding(
             padding: const EdgeInsets.only(bottom: 8.0),
-            child: HotTheme.buildLiveNetworkBadge(),
+            child: HotTheme.buildLiveNetworkBadge(
+              networkName: network.name.toUpperCase(),
+            ),
           ),
         ),
       ),

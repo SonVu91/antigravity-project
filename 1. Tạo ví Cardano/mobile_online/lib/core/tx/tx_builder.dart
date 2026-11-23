@@ -108,6 +108,26 @@ class TransactionBuilder {
     return calculateMinUtxoLovelace(assetCount) / 1000000.0;
   }
 
+  /// Tính toán phí chính xác theo kích thước byte thực tế (Protocol: minFeeA * size + minFeeB)
+  static int calculateExactFee({
+    required int txBodyBytesLength,
+    int witnessCount = 1,
+    int safetyBuffer = 8000,
+  }) {
+    final int estimatedFullTxBytes = txBodyBytesLength + (witnessCount * 102) + 20;
+    return (minFeeA * estimatedFullTxBytes) + minFeeB + safetyBuffer;
+  }
+
+  /// Ước lượng phí trước khi gửi tất cả (cho giao diện người dùng)
+  static int estimateSendMaxFee({
+    required int utxosCount,
+    bool hasTokens = false,
+  }) {
+    final count = utxosCount > 0 ? utxosCount : 1;
+    final estBytes = 200 + (count - 1) * 45 + (hasTokens ? 60 : 0);
+    return calculateExactFee(txBodyBytesLength: estBytes, witnessCount: 1);
+  }
+
   /// Xây dựng giao dịch chuyển ADA thuần (backward compatibility)
   static BuiltTxResult buildSimpleAdaTx({
     required String senderAddress,
@@ -115,6 +135,7 @@ class TransactionBuilder {
     required int sendLovelace,
     required List<Map<String, dynamic>> utxos,
     int? ttl,
+    bool sendMax = false,
   }) {
     return buildTransaction(
       senderAddress: senderAddress,
@@ -123,6 +144,7 @@ class TransactionBuilder {
       tokensToSend: const [],
       utxos: utxos,
       ttl: ttl,
+      sendMax: sendMax,
     );
   }
 
@@ -134,19 +156,15 @@ class TransactionBuilder {
     required List<TokenTransferItem> tokensToSend,
     required List<Map<String, dynamic>> utxos,
     int? ttl,
+    bool sendMax = false,
   }) {
     if (utxos.isEmpty) {
       throw Exception("Ví không có UTXO khả dụng để tạo giao dịch.");
     }
 
-    // 1. Kiểm tra Min-ADA cho Output người nhận
-    final int minRecipientAda = calculateMinUtxoLovelace(tokensToSend.length);
-    int effectiveSendLovelace = sendLovelace;
-    if (tokensToSend.isNotEmpty && effectiveSendLovelace < minRecipientAda) {
-      effectiveSendLovelace = minRecipientAda;
-    }
+    final effectiveTtl = ttl ?? calculateDefaultTtl();
 
-    // 2. Gom UTXO chọn lọc (Multi-Asset Coin Selection)
+    // Gom UTXO chọn lọc (Multi-Asset Coin Selection)
     final selectedInputs = <Map<String, dynamic>>[];
     final selectedInputKeys = <String>{};
     final accumulatedTokens = <String, BigInt>{};
@@ -168,6 +186,100 @@ class TransactionBuilder {
           accumulatedTokens[unit] = (accumulatedTokens[unit] ?? BigInt.zero) + q;
         }
       }
+    }
+
+    // ==========================================
+    // TRƯỜNG HỢP 1: GỬI TẤT CẢ (SEND MAX)
+    // ==========================================
+    if (sendMax && tokensToSend.isEmpty) {
+      // Ưu tiên gom các UTXO thuần ADA để không ảnh hưởng Native Tokens
+      final eligibleUtxos = utxos.where((u) {
+        final amounts = u['amount'] as List<dynamic>? ?? [];
+        return amounts.every((a) => a['unit'] == 'lovelace');
+      }).toList();
+
+      if (eligibleUtxos.isEmpty) {
+        for (final u in utxos) {
+          addUtxo(u);
+        }
+      } else {
+        for (final u in eligibleUtxos) {
+          addUtxo(u);
+        }
+      }
+
+      if (accumulatedLovelace <= 0) {
+        throw Exception("Số dư ADA không đủ để thực hiện Gửi tất cả.");
+      }
+
+      final distinctKeys = selectedInputs.map((u) => u['source_address'] ?? senderAddress).toSet().length;
+      final witnessCount = distinctKeys > 0 ? distinctKeys : 1;
+
+      // Lượt 1: Dự toán phí nháp
+      int draftFee = 180000 + (selectedInputs.length - 1) * 15000;
+      int draftSend = accumulatedLovelace - draftFee;
+      if (draftSend <= 0) {
+        throw Exception("Số dư (${(accumulatedLovelace / 1000000).toStringAsFixed(6)} ADA) không đủ chi trả phí mạng tối thiểu.");
+      }
+
+      final draftPayload = _generateConwayMultiAssetCborHex(
+        selectedInputs: selectedInputs,
+        recipientAddress: recipientAddress,
+        sendLovelace: draftSend,
+        sentTokens: const [],
+        changeAddress: senderAddress,
+        changeLovelace: 0,
+        changeTokens: const [],
+        fee: draftFee,
+        ttl: effectiveTtl,
+      );
+
+      // Lượt 2: Tính phí chuẩn xác theo byte thực tế
+      final draftBytes = hex.decode(draftPayload);
+      final int exactFee = calculateExactFee(
+        txBodyBytesLength: draftBytes.length,
+        witnessCount: witnessCount,
+      );
+
+      final int finalSendLovelace = accumulatedLovelace - exactFee;
+      if (finalSendLovelace < minPureAdaChangeLovelace) {
+        throw Exception(
+          "Số dư sau khi trừ phí mạng (${(finalSendLovelace / 1000000).toStringAsFixed(6)} ADA) nhỏ hơn mức gửi tối thiểu 1 ADA theo quy định Cardano.",
+        );
+      }
+
+      final finalPayload = _generateConwayMultiAssetCborHex(
+        selectedInputs: selectedInputs,
+        recipientAddress: recipientAddress,
+        sendLovelace: finalSendLovelace,
+        sentTokens: const [],
+        changeAddress: senderAddress,
+        changeLovelace: 0,
+        changeTokens: const [],
+        fee: exactFee,
+        ttl: effectiveTtl,
+      );
+
+      final inputsUsed = selectedInputs.map((u) => "${u['tx_hash']}#${u['tx_index']}").toList();
+      return BuiltTxResult(
+        rawCborHex: "TxBodyConway:$finalPayload",
+        feeLovelace: exactFee,
+        sendLovelace: finalSendLovelace,
+        changeLovelace: 0,
+        inputsUsed: inputsUsed,
+        sentTokens: const [],
+        changeTokens: const [],
+      );
+    }
+
+    // ==========================================
+    // TRƯỜNG HỢP 2: GỬI THƯỜNG (CÓ SỐ LƯỢNG CỤ THỂ HOẶC KÈM TOKENS)
+    // ==========================================
+    // 1. Kiểm tra Min-ADA cho Output người nhận
+    final int minRecipientAda = calculateMinUtxoLovelace(tokensToSend.length);
+    int effectiveSendLovelace = sendLovelace;
+    if (tokensToSend.isNotEmpty && effectiveSendLovelace < minRecipientAda) {
+      effectiveSendLovelace = minRecipientAda;
     }
 
     // Bước 2a: Ưu tiên gom các UTXO chứa token cần gửi
@@ -214,7 +326,7 @@ class TransactionBuilder {
       }
     }
 
-    // Bước 2c: Tính toán Min-ADA cho tiền thối và Phí mạng
+    // Bước 2c: Min-ADA cho tiền thối
     final int minChangeLovelace = changeTokensList.isNotEmpty
         ? calculateMinUtxoLovelace(changeTokensList.length)
         : minPureAdaChangeLovelace;
@@ -249,31 +361,37 @@ class TransactionBuilder {
       );
     }
 
-    // Bước 2e: Tính toán tiền thối Lovelace
+    // Bước 2e: Tính toán tiền thối Lovelace và gom thêm UTXO để đạt Min-ADA tiền thối
     int changeLovelace = accumulatedLovelace - effectiveSendLovelace - estimatedFee;
     if (changeLovelace > 0 && changeLovelace < minChangeLovelace) {
-      if (changeTokensList.isNotEmpty) {
-        // Cần thêm UTXO để đạt minChangeLovelace cho tiền thối token
-        final sortedByAda = List<Map<String, dynamic>>.from(utxos);
-        for (final u in sortedByAda) {
-          addUtxo(u);
-          changeLovelace = accumulatedLovelace - effectiveSendLovelace - estimatedFee;
-          if (changeLovelace >= minChangeLovelace) break;
-        }
-      } else {
-        // Không có token trong change, gộp phần thừa nhỏ vào phí
-        estimatedFee += changeLovelace;
-        changeLovelace = 0;
+      final remainingUtxos = utxos.where((u) => !selectedInputKeys.contains("${u['tx_hash']}#${u['tx_index']}")).toList();
+      remainingUtxos.sort((a, b) {
+        final qA = int.parse(a['amount'][0]['quantity']);
+        final qB = int.parse(b['amount'][0]['quantity']);
+        return qB.compareTo(qA);
+      });
+
+      for (final u in remainingUtxos) {
+        addUtxo(u);
+        estimatedFee = tokensToSend.isEmpty && selectedInputs.length <= 1
+            ? 180000
+            : (180000 + (tokensToSend.length * 20000) + ((selectedInputs.length - 1) * 15000));
+        changeLovelace = accumulatedLovelace - effectiveSendLovelace - estimatedFee;
+        if (changeLovelace >= minChangeLovelace) break;
+      }
+
+      if (changeLovelace > 0 && changeLovelace < minChangeLovelace) {
+        throw Exception(
+          "Số dư còn lại sau khi gửi (${(changeLovelace / 1000000).toStringAsFixed(6)} ADA) không đủ mức tối thiểu 1 ADA theo quy định Cardano (Min-UTXO).\n\nVui lòng bấm 'GỬI TẤT CẢ' nếu muốn gửi toàn bộ ví, hoặc điều chỉnh lại số lượng gửi!",
+        );
       }
     }
 
-    final inputsUsed = selectedInputs.map((u) => "${u['tx_hash']}#${u['tx_index']}").toList();
+    // Bước 2f: Tính toán phí chính xác 2 lượt (Iterative Fee Calculation)
+    final distinctKeys = selectedInputs.map((u) => u['source_address'] ?? senderAddress).toSet().length;
+    final witnessCount = distinctKeys > 0 ? distinctKeys : 1;
 
-    // 3. Tuần tự hóa CBOR Conway Transaction Body
-    final buffer = StringBuffer();
-    buffer.write("TxBodyConway:");
-
-    final hexPayload = _generateConwayMultiAssetCborHex(
+    final draftPayload = _generateConwayMultiAssetCborHex(
       selectedInputs: selectedInputs,
       recipientAddress: recipientAddress,
       sendLovelace: effectiveSendLovelace,
@@ -282,16 +400,41 @@ class TransactionBuilder {
       changeLovelace: changeLovelace,
       changeTokens: changeTokensList,
       fee: estimatedFee,
-      ttl: ttl ?? calculateDefaultTtl(),
+      ttl: effectiveTtl,
     );
 
-    buffer.write(hexPayload);
+    final draftBytes = hex.decode(draftPayload);
+    final int exactFee = calculateExactFee(
+      txBodyBytesLength: draftBytes.length,
+      witnessCount: witnessCount,
+    );
+
+    int finalFee = exactFee;
+    int finalChangeLovelace = accumulatedLovelace - effectiveSendLovelace - finalFee;
+    if (finalChangeLovelace > 0 && finalChangeLovelace < minChangeLovelace) {
+      finalFee = estimatedFee;
+      finalChangeLovelace = accumulatedLovelace - effectiveSendLovelace - finalFee;
+    }
+
+    final finalPayload = _generateConwayMultiAssetCborHex(
+      selectedInputs: selectedInputs,
+      recipientAddress: recipientAddress,
+      sendLovelace: effectiveSendLovelace,
+      sentTokens: tokensToSend,
+      changeAddress: senderAddress,
+      changeLovelace: finalChangeLovelace,
+      changeTokens: changeTokensList,
+      fee: finalFee,
+      ttl: effectiveTtl,
+    );
+
+    final inputsUsed = selectedInputs.map((u) => "${u['tx_hash']}#${u['tx_index']}").toList();
 
     return BuiltTxResult(
-      rawCborHex: buffer.toString(),
-      feeLovelace: estimatedFee,
+      rawCborHex: "TxBodyConway:$finalPayload",
+      feeLovelace: finalFee,
       sendLovelace: effectiveSendLovelace,
-      changeLovelace: changeLovelace,
+      changeLovelace: finalChangeLovelace,
       inputsUsed: inputsUsed,
       sentTokens: tokensToSend,
       changeTokens: changeTokensList,

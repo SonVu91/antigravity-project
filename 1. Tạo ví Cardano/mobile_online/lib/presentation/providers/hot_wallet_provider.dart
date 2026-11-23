@@ -57,12 +57,16 @@ class HotWalletState {
 
   WatchedWalletEntry? get activeWallet {
     if (watchedWallets.isEmpty) return null;
-    if (activeWalletId != null) {
-      final found = watchedWallets.where((w) => w.id == activeWalletId);
-      if (found.isNotEmpty) return found.first;
+    if (activeWalletId != null && watchedAddress != null) {
+      final foundBoth = watchedWallets.where((w) => w.id == activeWalletId && w.address == watchedAddress);
+      if (foundBoth.isNotEmpty) return foundBoth.first;
     }
     if (watchedAddress != null) {
       final found = watchedWallets.where((w) => w.address == watchedAddress);
+      if (found.isNotEmpty) return found.first;
+    }
+    if (activeWalletId != null) {
+      final found = watchedWallets.where((w) => w.id == activeWalletId);
       if (found.isNotEmpty) return found.first;
     }
     return watchedWallets.first;
@@ -152,16 +156,31 @@ class HotWalletNotifier extends StateNotifier<HotWalletState> {
         _client.customApiKey = apiKey;
       }
 
+      final savedActiveId = saved['activeWalletId'] as String?;
+      WatchedWalletEntry? initialWallet;
+      if (savedActiveId != null && walletEntries.isNotEmpty) {
+        final match = walletEntries.where((w) => w.id == savedActiveId);
+        if (match.isNotEmpty) initialWallet = match.first;
+      }
+      if (initialWallet == null && addr != null && walletEntries.isNotEmpty) {
+        final match = walletEntries.where((w) => w.address == addr);
+        if (match.isNotEmpty) initialWallet = match.first;
+      }
+      initialWallet ??= walletEntries.isNotEmpty ? walletEntries.first : null;
+
+      final effAddr = initialWallet?.address ?? addr;
+      final effActiveId = initialWallet?.id ?? savedActiveId;
+
       state = state.copyWith(
-        watchedAddress: addr,
+        watchedAddress: effAddr,
         watchedWallets: walletEntries,
-        activeWalletId: walletEntries.isNotEmpty ? walletEntries.first.id : null,
+        activeWalletId: effActiveId,
         network: net,
         balanceAda: balance,
         txHistory: history,
       );
 
-      if (addr != null && addr.isNotEmpty) {
+      if (effAddr != null && effAddr.isNotEmpty) {
         fetchBalance();
         fetchAllBalances();
       }
@@ -209,6 +228,7 @@ class HotWalletNotifier extends StateNotifier<HotWalletState> {
 
     _migration.saveState(
       watchedAddress: cleanAddr,
+      activeWalletId: assignedId,
       watchedWalletsEntries: updatedWallets,
     );
 
@@ -251,7 +271,10 @@ class HotWalletNotifier extends StateNotifier<HotWalletState> {
       stakeAddress: null,
     );
 
-    _migration.saveState(watchedAddress: target.address);
+    _migration.saveState(
+      watchedAddress: target.address,
+      activeWalletId: target.id,
+    );
     fetchBalance();
   }
 
@@ -283,6 +306,7 @@ class HotWalletNotifier extends StateNotifier<HotWalletState> {
 
     _migration.saveState(
       watchedAddress: nextAddr ?? '',
+      activeWalletId: nextId,
       watchedWalletsEntries: updated,
     );
 
@@ -583,16 +607,7 @@ class HotWalletNotifier extends StateNotifier<HotWalletState> {
       throw Exception("Chưa cài đặt địa chỉ ví theo dõi.");
     }
 
-    int sendLovelace;
-    if (sendMax && tokensToSend.isEmpty) {
-      const estFee = 180000;
-      sendLovelace = state.totalLovelace - estFee;
-      if (sendLovelace <= 0) {
-        throw Exception("Số dư không đủ để chi trả phí giao dịch tối thiểu.");
-      }
-    } else {
-      sendLovelace = (amountAda * 1000000).round();
-    }
+    final int sendLovelace = sendMax ? state.totalLovelace : (amountAda * 1000000).round();
 
     int? liveTtl;
     try {
@@ -607,6 +622,7 @@ class HotWalletNotifier extends StateNotifier<HotWalletState> {
       tokensToSend: tokensToSend,
       utxos: state.utxos,
       ttl: liveTtl,
+      sendMax: sendMax,
     );
 
     state = state.copyWith(lastBuiltTx: result);

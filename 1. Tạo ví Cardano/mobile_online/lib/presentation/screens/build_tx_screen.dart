@@ -129,14 +129,20 @@ class _BuildTxScreenState extends ConsumerState<BuildTxScreen> {
   }
 
   void _onSendMaxChecked() {
-    setState(() {
-      _isSendMax = true;
-      final state = ref.read(hotWalletProvider);
-      final maxAda = (state.totalLovelace - 180000) / 1000000.0;
-      if (maxAda > 0) {
-        _amountController.text = maxAda.toStringAsFixed(6);
-      }
-    });
+    final state = ref.read(hotWalletProvider);
+    if (state.totalLovelace <= 0) return;
+    final int estFee = TransactionBuilder.estimateSendMaxFee(
+      utxosCount: state.utxos.length,
+      hasTokens: _selectedTokens.isNotEmpty,
+    );
+    final maxLovelace = state.totalLovelace - estFee;
+    if (maxLovelace > 0) {
+      setState(() {
+        _isSendMax = true;
+        _amountController.text = (maxLovelace / 1000000.0).toStringAsFixed(6);
+        _error = null;
+      });
+    }
   }
 
   void _showAddTokenDialog(BuildContext context, List<TokenAsset> walletTokens) {
@@ -408,6 +414,14 @@ class _BuildTxScreenState extends ConsumerState<BuildTxScreen> {
             TextField(
               controller: _amountController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              onChanged: (_) {
+                if (_isSendMax) {
+                  setState(() => _isSendMax = false);
+                }
+                if (_error != null) {
+                  setState(() => _error = null);
+                }
+              },
               decoration: InputDecoration(
                 labelText: _selectedTokens.isNotEmpty ? "Số lượng ADA (Đính kèm cùng Token)" : "Số lượng ADA",
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

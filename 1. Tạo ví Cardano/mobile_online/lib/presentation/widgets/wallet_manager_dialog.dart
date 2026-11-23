@@ -410,7 +410,9 @@ class _WalletManagerDialogState extends ConsumerState<WalletManagerDialog> {
                           ),
                           child: Theme(
                             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                            child: ExpansionTile(
+                            child: Material(
+                              type: MaterialType.transparency,
+                              child: ExpansionTile(
                               initiallyExpanded: true,
                               leading: const Icon(Icons.folder, color: Colors.amberAccent, size: 22),
                               title: Row(
@@ -553,6 +555,7 @@ class _WalletManagerDialogState extends ConsumerState<WalletManagerDialog> {
                                   ),
                                 );
                               }).toList(),
+                            ),
                             ),
                           ),
                         );

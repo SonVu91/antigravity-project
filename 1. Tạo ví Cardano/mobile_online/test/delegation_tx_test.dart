@@ -69,6 +69,7 @@ void main() {
       expect(result.depositAda, equals(2.0));
 
       // Verify Conway CDDL compliance (no invalid map key 25) by parsing & signing via Rust Core
+      if (!CardanoCoreBridge.isNativeAvailable) return;
       const mnemonic = 'test walk nut penalty hip pave soap entry language right filter choice';
       final wallet = CardanoCoreBridge.createWallet(mnemonic, isTestnet: true);
       final realDelegation = TransactionBuilder.buildDelegationTx(

@@ -5,13 +5,14 @@ import '../models/watched_wallet_entry.dart';
 
 class HotMigrationService {
   static const int currentSchemaVersion = 3;
-  static const String appVersion = "2.0.5";
+  static const String appVersion = "2.0.13";
 
   static const String keySchemaVersion = 'hot_schema_version';
   static const String keyAppVersion = 'hot_app_version';
   static const String keyWatchedAddress = 'hot_watched_address';
   static const String keyWatchedWallets = 'hot_watched_wallets';
   static const String keyWatchedWalletsV3 = 'hot_watched_wallets_v3';
+  static const String keyActiveWalletId = 'hot_active_wallet_id';
   static const String keyNetwork = 'hot_network';
   static const String keyApiKey = 'hot_custom_api_key';
   static const String keyApiKeyPreprod = 'hot_custom_api_key_preprod';
@@ -190,10 +191,13 @@ class HotMigrationService {
       txHistory = list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (_) {}
 
+    final activeWalletId = prefs.getString(keyActiveWalletId);
+
     return {
       'watchedAddress': address ?? (walletEntries.isNotEmpty ? walletEntries.first.address : null),
       'watchedWalletsEntries': walletEntries,
       'watchedWallets': walletEntries.map((e) => e.address).toList(),
+      'activeWalletId': activeWalletId,
       'network': network,
       'apiKey': apiKey,
       'cachedBalance': balance,
@@ -203,6 +207,7 @@ class HotMigrationService {
 
   Future<void> saveState({
     String? watchedAddress,
+    String? activeWalletId,
     List<WatchedWalletEntry>? watchedWalletsEntries,
     List<String>? watchedWallets,
     CardanoNetwork? network,
@@ -213,6 +218,9 @@ class HotMigrationService {
     final prefs = await SharedPreferences.getInstance();
     if (watchedAddress != null) {
       await prefs.setString(keyWatchedAddress, watchedAddress);
+    }
+    if (activeWalletId != null) {
+      await prefs.setString(keyActiveWalletId, activeWalletId);
     }
     if (watchedWalletsEntries != null) {
       await prefs.setString(keyWatchedWalletsV3, WatchedWalletEntry.encodeList(watchedWalletsEntries));
@@ -249,6 +257,7 @@ class HotMigrationService {
       "network": (state['network'] as CardanoNetwork).name,
       if (includeApiKey) "api_key": state['apiKey'],
       "watched_address": state['watchedAddress'],
+      "active_wallet_id": state['activeWalletId'],
       "watched_wallets_v3": entries.map((e) => e.toJson()).toList(),
       "watched_wallets": state['watchedWallets'],
       "cached_balance": state['cachedBalance'],
@@ -275,6 +284,7 @@ class HotMigrationService {
 
       final apiKey = data["api_key"] as String?;
       final addr = data["watched_address"] as String?;
+      final activeId = data["active_wallet_id"] as String?;
       List<WatchedWalletEntry> entries = [];
       if (data["watched_wallets_v3"] != null) {
         final list = data["watched_wallets_v3"] as List<dynamic>;
@@ -299,6 +309,7 @@ class HotMigrationService {
 
       await saveState(
         watchedAddress: addr,
+        activeWalletId: activeId,
         watchedWalletsEntries: entries,
         network: network,
         apiKey: apiKey,

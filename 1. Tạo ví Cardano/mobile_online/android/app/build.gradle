@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.cardano.airgap.mobile_online"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 35
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

@@ -1,7 +1,7 @@
 name: mobile_online
-description: "Cardano Hot Watch-Only Wallet v2.0.13"
+description: "Cardano Hot Watch-Only Wallet v2.0.14"
 publish_to: 'none'
-version: 2.0.13+14
+version: 2.0.14+15
 
 environment:
   sdk: ^3.5.0

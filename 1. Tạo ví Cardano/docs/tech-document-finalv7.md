@@ -1628,7 +1628,7 @@ ebbee334d6d002b75d1a1c816d5f9b9c0239b226990a60933fda95c2da52b2a4  cardano-cold-w
 2da1f8c3d901f4abc0c503304fdcba53b8d0fc07baf2eecaa6f856a0488b40f0  cardano-hot-wallet-v2.0.17-arm64.apk
 a6a88380249d6f222d6f7e7b9aa4719567340f45243688df2b874b9edfd4ba87  cardano-hot-wallet-v2.0.17-universal.apk
 a6a88380249d6f222d6f7e7b9aa4719567340f45243688df2b874b9edfd4ba87  cardano-hot-wallet-v2.0.17.apk
-882232c380e822b195d01e77ca944fdc3b7c89aede87dbe6c4be0b0b1825b9b6  cardano-hot-wallet-web-v2.0.17.zip
+181a8a28001e084662ab4748e4e0334c99bcef5ce7dbd4f5973ee7fd0ade635b  cardano-hot-wallet-web-v2.0.17.zip
 
 [ CÁC PHIÊN BẢN TIỀN NHIỆM ]
 63ede988f626f188f7e4e82809ca2aa7a18ce545d9079f3f5cf15461c574e46e  cardano-hot-wallet-web-v2.0.13.zip

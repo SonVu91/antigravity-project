@@ -1024,7 +1024,7 @@ class TransactionBuilder {
     bytes.add(0x03);
     _writeCborUint(bytes, ttl);
 
-    // Key 4: certs (Chứa chứng chỉ UnregCert Tag 8 kèm deposit hoàn lại)
+    // Key 4: certs (Chứa chứng chỉ StakeDeregistration Type 1 chuẩn Universal Cardano)
     bytes.add(0x04);
     _writeCborArrayHeader(bytes, 1);
 
@@ -1044,15 +1044,15 @@ class TransactionBuilder {
       throw Exception("Không thể trích xuất Stake Credential (28 bytes) từ địa chỉ ví: $stakeAddress");
     }
 
-    // UnregCert (Type 8): [8, [0, stakeCred], deposit]
-    bytes.add(0x83); // array 3
-    bytes.add(0x08); // Type 8: UnregCert
+    // StakeDeregistration (Type 1): [1, [0, stakeCred]]
+    // Chuẩn tương thích 100% với Cardano Mainnet (Shelley, Babbage & Conway)
+    bytes.add(0x82); // array 2
+    bytes.add(0x01); // Type 1: StakeDeregistration
     bytes.add(0x82); // Array 2: StakeCredential (KeyHash)
     bytes.add(0x00);
     bytes.add(0x58);
     bytes.add(0x1c); // 28 bytes
     bytes.addAll(stakeCred);
-    _writeCborUint(bytes, depositRefundLovelace);
 
     // Key 5: withdrawals (nếu có rút thưởng)
     if (withdrawLovelace > 0) {

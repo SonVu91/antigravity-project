@@ -178,5 +178,24 @@ void main() {
         throwsException,
       );
     });
+    test('Build Stake Deregistration transaction with Universal Type 1 StakeDeregistration certificate', () {
+      final result = TransactionBuilder.buildStakeDeregistrationTx(
+        senderAddress: senderAddr,
+        stakeAddress: stakeAddr,
+        withdrawLovelace: 0,
+        utxos: mockUtxos,
+      );
+
+      expect(result.rawCborHex.startsWith('TxBodyConwayWithdrawal:'), isTrue);
+      expect(result.feeLovelace, equals(195000));
+      expect(result.depositRefundLovelace, equals(2000000));
+      // Input (50 ADA) + Deposit refund (2 ADA) - Fee (0.195 ADA) = 51.805 ADA
+      expect(result.sendLovelace, equals(50000000 + 2000000 - 195000));
+      expect(result.isDeregistration, isTrue);
+
+      // Verify that the CBOR payload contains StakeDeregistration (Type 1: 0x82, 0x01, 0x82, 0x00, 0x58, 0x1c)
+      final cleanHex = result.rawCborHex.replaceFirst('TxBodyConwayWithdrawal:', '');
+      expect(cleanHex.contains('82018200581c'), isTrue, reason: 'Must contain Type 1 StakeDeregistration cert');
+    });
   });
 }

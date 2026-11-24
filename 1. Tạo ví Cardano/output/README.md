@@ -12,15 +12,15 @@ Thư mục này chứa toàn bộ sản phẩm hoàn chỉnh và đóng gói c�
 
 ```
 output/
-├── cardano-cold-wallet-v2.0.17.apk               # BẢN CÀI ĐẶT CHÍNH THỨC VÍ LẠNH (~57.2 MB Universal)
+├── cardano-cold-wallet-v2.0.17.apk               # BẢN CÀI ĐẶT CHÍNH THỨC VÍ LẠNH (~25.1 MB Universal)
 │                                                  (Tương thích 100% 32-bit ARMv7 cho J7 Prime & 64-bit)
-├── cardano-cold-wallet-v2.0.17-armv7.apk         # Bản rút gọn tối ưu riêng cho ARMv7 32-bit (~18.3 MB)
-├── cardano-cold-wallet-v2.0.17-arm64.apk         # Bản rút gọn tối ưu riêng cho ARM64 64-bit (~20.9 MB)
-├── cardano-cold-wallet-v2.0.17-universal.apk     # Bản Universal nguyên gốc (~57.2 MB)
+├── cardano-cold-wallet-v2.0.17-armv7.apk         # Bản rút gọn tối ưu riêng cho ARMv7 32-bit (~8.7 MB)
+├── cardano-cold-wallet-v2.0.17-arm64.apk         # Bản rút gọn tối ưu riêng cho ARM64 64-bit (~9.1 MB)
+├── cardano-cold-wallet-v2.0.17-universal.apk     # Bản Universal nguyên gốc (~25.1 MB)
 │
-├── cardano-hot-wallet-v2.0.17.apk                # BẢN CÀI ĐẶT VÍ NÓNG ANDROID (~53.8 MB Universal)
-├── cardano-hot-wallet-v2.0.17-armv7.apk          # Ví Nóng rút gọn ARMv7 (~16.7 MB)
-├── cardano-hot-wallet-v2.0.17-arm64.apk          # Ví Nóng rút gọn ARM64 (~18.9 MB)
+├── cardano-hot-wallet-v2.0.17.apk                # BẢN CÀI ĐẶT VÍ NÓNG ANDROID (~23.4 MB Universal)
+├── cardano-hot-wallet-v2.0.17-armv7.apk          # Ví Nóng rút gọn ARMv7 (~8.1 MB)
+├── cardano-hot-wallet-v2.0.17-arm64.apk          # Ví Nóng rút gọn ARM64 (~8.2 MB)
 │
 ├── cardano-hot-wallet-web-v2.0.17.zip            # Gói nén Web Hot Wallet v2.0.17 deploy PWA (~14.9 MB)
 ├── web_hot_wallet/                               # Thư mục Web Hot Wallet xuất bản GitHub Pages

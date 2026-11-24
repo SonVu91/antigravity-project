@@ -1227,17 +1227,26 @@ class TransactionBuilder {
   }
 
   static void _writeCborBigInt(List<int> bytes, BigInt value) {
-    if (value <= BigInt.from(0xffffffff)) {
-      _writeCborUint(bytes, value.toInt());
+    if (value < BigInt.from(24)) {
+      bytes.add(value.toInt());
+    } else if (value <= BigInt.from(0xff)) {
+      bytes.add(0x18);
+      bytes.add(value.toInt());
+    } else if (value <= BigInt.from(0xffff)) {
+      bytes.add(0x19);
+      bytes.add(((value >> 8) & BigInt.from(0xff)).toInt());
+      bytes.add((value & BigInt.from(0xff)).toInt());
+    } else if (value <= BigInt.from(0xffffffff)) {
+      bytes.add(0x1a);
+      bytes.add(((value >> 24) & BigInt.from(0xff)).toInt());
+      bytes.add(((value >> 16) & BigInt.from(0xff)).toInt());
+      bytes.add(((value >> 8) & BigInt.from(0xff)).toInt());
+      bytes.add((value & BigInt.from(0xff)).toInt());
     } else {
       bytes.add(0x1b);
-      var temp = value;
-      final b = <int>[];
-      for (int i = 0; i < 8; i++) {
-        b.add((temp & BigInt.from(0xff)).toInt());
-        temp = temp >> 8;
+      for (int i = 7; i >= 0; i--) {
+        bytes.add(((value >> (i * 8)) & BigInt.from(0xff)).toInt());
       }
-      bytes.addAll(b.reversed);
     }
   }
 
@@ -1251,17 +1260,8 @@ class TransactionBuilder {
       bytes.add(0x19);
       bytes.add((value >> 8) & 0xff);
       bytes.add(value & 0xff);
-    } else if (value <= 0xffffffff) {
-      bytes.add(0x1a);
-      bytes.add((value >> 24) & 0xff);
-      bytes.add((value >> 16) & 0xff);
-      bytes.add((value >> 8) & 0xff);
-      bytes.add(value & 0xff);
     } else {
-      bytes.add(0x1b);
-      for (int i = 7; i >= 0; i--) {
-        bytes.add((value >> (i * 8)) & 0xff);
-      }
+      _writeCborBigInt(bytes, BigInt.from(value));
     }
   }
 

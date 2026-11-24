@@ -499,6 +499,35 @@ void main() {
       expect(result.rawCborHex.startsWith("TxBodyConwayWithdrawal:"), isTrue);
     });
 
+    test('Build Conway Stake Deregistration transaction correctly encodes 64-bit amounts (> 4294 ADA)', () {
+      const senderAddr = "addr_test1qqe7la8397klhm56gnqz029da79jgz249fzemm7j2uu4st2dc8etegkawayvpf867vhs93d70gjsgdwrl88tymkq8p6qec0p73";
+      const stakeAddr = "stake_test1upxuru4u5twhwjxq5na0xtczckl85fgyxhplnn4jdmqrsaqm46y5m";
+      // 28,000 ADA UTXO = 28,000,000,000 Lovelace (exceeds 32-bit int 4,294,967,295)
+      final largeUtxos = [
+        {
+          "tx_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
+          "tx_index": 0,
+          "amount": [
+            {"unit": "lovelace", "quantity": "28000000000"}
+          ]
+        }
+      ];
+
+      final result = TransactionBuilder.buildStakeDeregistrationTx(
+        senderAddress: senderAddr,
+        stakeAddress: stakeAddr,
+        withdrawLovelace: 0,
+        utxos: largeUtxos,
+      );
+
+      expect(result.isDeregistration, isTrue);
+      // Net Output = 28,000,000,000 + 2,000,000 - 195,000 = 28,001,805,000 Lovelace
+      expect(result.sendLovelace, 28001805000);
+      // 28,001,805,000 in hex is 0x068509a2c8. In 64-bit CBOR: 1b 000000068509a2c8
+      final hex = result.rawCborHex;
+      expect(hex.contains("1b000000068509a2c8"), isTrue);
+    });
+
     test('Throws error when trying to deregister stake with no UTXOs', () {
       const senderAddr = "addr_test1qqe7la8397klhm56gnqz029da79jgz249fzemm7j2uu4st2dc8etegkawayvpf867vhs93d70gjsgdwrl88tymkq8p6qec0p73";
       const stakeAddr = "stake_test1upxuru4u5twhwjxq5na0xtczckl85fgyxhplnn4jdmqrsaqm46y5m";

@@ -19,13 +19,13 @@
   </script>
 
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://cardano-mainnet.blockfrost.io https://cardano-preprod.blockfrost.io https://cardano-preview.blockfrost.io https://api.github.com; img-src 'self' data: blob:; media-src 'self' blob:; object-src 'none'; base-uri 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' https://cardano-mainnet.blockfrost.io https://cardano-preprod.blockfrost.io https://cardano-preview.blockfrost.io https://api.github.com https://www.gstatic.com https://fonts.gstatic.com data: blob:; img-src 'self' data: blob:; media-src 'self' blob:; object-src 'none'; base-uri 'self';">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="description" content="Cardano Hot Watch-Only Wallet v2.0.13 (Air-Gap Edition) - Safe offline monitoring and transaction broadcasting for Cardano.">
+  <meta name="description" content="Cardano Hot Watch-Only Wallet v2.0.17 (Air-Gap Edition) - Safe offline monitoring and transaction broadcasting for Cardano.">
 
   <!-- Apple iOS PWA Meta Tags -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -53,6 +53,66 @@
       padding: 0;
       overflow-x: hidden;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Startup Splash Loader */
+    #flutter-loader-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #0b0e14;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 999999;
+      color: #cbd5e1;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      transition: opacity 0.4s ease-out;
+    }
+    .loader-brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    .loader-icon {
+      width: 68px;
+      height: 68px;
+      margin-bottom: 14px;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(255, 107, 0, 0.35);
+    }
+    .loader-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: 0.5px;
+    }
+    .loader-badge {
+      font-size: 11px;
+      font-weight: 600;
+      color: #ff6b00;
+      background: rgba(255, 107, 0, 0.12);
+      border: 1px solid rgba(255, 107, 0, 0.35);
+      border-radius: 12px;
+      padding: 3px 10px;
+      margin-top: 6px;
+    }
+    .loader-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(255, 107, 0, 0.2);
+      border-top-color: #ff6b00;
+      border-radius: 50%;
+      animation: qr-spin 0.8s linear infinite;
+      margin-bottom: 14px;
+    }
+    .loader-text {
+      font-size: 13px;
+      color: #94a3b8;
     }
 
     /* Modal Overlay cho Live Camera Scanner */
@@ -572,6 +632,17 @@
   </script>
 </head>
 <body>
+  <!-- Màn hình chờ khởi động ứng dụng (Splash Screen) -->
+  <div id="flutter-loader-overlay">
+    <div class="loader-brand">
+      <img class="loader-icon" src="icons/Icon-192.png" alt="Cardano Hot Wallet" onerror="this.style.display='none'">
+      <div class="loader-title">Cardano Hot Wallet</div>
+      <div class="loader-badge">Phiên bản v2.0.17 (Air-Gap)</div>
+    </div>
+    <div class="loader-spinner"></div>
+    <div class="loader-text">Đang tải và khởi tạo ứng dụng...</div>
+  </div>
+
   <!-- Modal Quét Live Camera Web -->
   <div id="qr-scanner-modal">
     <div class="qr-modal-header">
@@ -629,36 +700,41 @@
   </div>
 
   <script>
-    // Tự động kiểm tra và xóa cache PWA Service Worker cũ khi có bản cập nhật mới
+    // Cơ chế xóa triệt để cache và service worker phiên bản cũ (v2.0.16 trở về trước)
     (function() {
-      if ('caches' in window) {
-        fetch('version.json?t=' + Date.now())
-          .then(function(r) { return r.json(); })
-          .then(function(ver) {
-            var currentVersion = ver.version + '+' + ver.build_number;
-            var storedVersion = localStorage.getItem('cardano_hot_wallet_version');
-            if (storedVersion && storedVersion !== currentVersion) {
-              console.log('[CacheBuster] Phát hiện phiên bản mới: ' + currentVersion + ' (cũ: ' + storedVersion + '). Đang làm mới cache...');
-              localStorage.setItem('cardano_hot_wallet_version', currentVersion);
-              caches.keys().then(function(keys) {
-                return Promise.all(keys.map(function(k) { return caches.delete(k); }));
-              }).then(function() {
-                if ('serviceWorker' in navigator) {
-                  navigator.serviceWorker.getRegistrations().then(function(regs) {
-                    return Promise.all(regs.map(function(r) { return r.unregister(); }));
-                  }).then(function() {
-                    window.location.reload();
-                  });
-                } else {
-                  window.location.reload();
-                }
-              });
-            } else {
-              localStorage.setItem('cardano_hot_wallet_version', currentVersion);
-            }
-          })
-          .catch(function(err) {});
+      var TARGET_BUILD = '2.0.17+18';
+      var stored = localStorage.getItem('cardano_hot_wallet_version');
+      if (stored !== TARGET_BUILD) {
+        console.log('[CacheBuster] Cập nhật phiên bản: ' + TARGET_BUILD + ' (cũ: ' + stored + '). Tiến hành dọn dẹp cache...');
+        localStorage.setItem('cardano_hot_wallet_version', TARGET_BUILD);
+        if ('caches' in window) {
+          caches.keys().then(function(keys) {
+            return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+          });
+        }
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(regs) {
+            return Promise.all(regs.map(function(r) { return r.unregister(); }));
+          });
+        }
       }
+
+      // Tự động gỡ bỏ Splash Screen khi Flutter đã vẽ giao diện
+      var maxWait = 25000;
+      var startTime = Date.now();
+      var checkLoaded = setInterval(function() {
+        var flutterRendered = document.querySelector('flutter-view') || 
+                              document.querySelector('flt-glass-pane') ||
+                              document.querySelector('flt-scene-host');
+        if (flutterRendered || (Date.now() - startTime > maxWait)) {
+          clearInterval(checkLoaded);
+          var overlay = document.getElementById('flutter-loader-overlay');
+          if (overlay) {
+            overlay.style.opacity = '0';
+            setTimeout(function() { overlay.remove(); }, 400);
+          }
+        }
+      }, 100);
     })();
   </script>
   <script src="flutter_bootstrap.js?v=2.0.17" async></script>

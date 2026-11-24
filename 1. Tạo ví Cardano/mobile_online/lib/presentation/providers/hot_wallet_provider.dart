@@ -578,6 +578,18 @@ class HotWalletNotifier extends StateNotifier<HotWalletState> {
       throw Exception("Không tìm thấy địa chỉ Stake Address để hủy đăng ký.");
     }
 
+    // 1. Luôn truy vấn số dư thưởng trực tiếp theo thời gian thực (từng Lovelace) từ mạng Cardano trước khi dựng giao dịch
+    int liveRewardLovelace = state.withdrawableRewardLovelace;
+    try {
+      final stakeDetails = await _client.getStakeAccountDetails(state.stakeAddress!);
+      liveRewardLovelace = stakeDetails.rewardsAvailableLovelace.toInt();
+      state = state.copyWith(
+        withdrawableRewardLovelace: liveRewardLovelace,
+        withdrawableRewardAda: stakeDetails.rewardsAda,
+        stakeInfo: stakeDetails,
+      );
+    } catch (_) {}
+
     int? liveTtl;
     try {
       final slot = await _client.getLatestSlot();
@@ -587,7 +599,7 @@ class HotWalletNotifier extends StateNotifier<HotWalletState> {
     final result = TransactionBuilder.buildStakeDeregistrationTx(
       senderAddress: state.watchedAddress!,
       stakeAddress: state.stakeAddress!,
-      withdrawLovelace: state.withdrawableRewardLovelace,
+      withdrawLovelace: liveRewardLovelace,
       utxos: state.utxos,
       destinationAddress: destinationAddress,
       ttl: liveTtl,

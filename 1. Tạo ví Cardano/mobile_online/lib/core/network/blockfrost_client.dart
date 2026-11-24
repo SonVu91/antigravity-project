@@ -338,11 +338,41 @@ class BlockfrostClient {
     try {
       final response = await http.get(url, headers: _headers);
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
-      } else if (response.statusCode == 404) {
-        return null;
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        // Nếu số dư thưởng trả về hợp lệ (> 0 hoặc có giá trị), sử dụng trực tiếp
+        if (data['withdrawable_amount'] != null) {
+          return data;
+        }
       }
     } catch (_) {}
+
+    // Fallback sang Koios REST API (Miễn phí, không cần key, truy vấn trực tiếp Node Cardano Mainnet)
+    if (network == CardanoNetwork.mainnet) {
+      try {
+        final koiosUrl = Uri.parse("https://api.koios.rest/api/v1/account_info");
+        final koiosResp = await http.post(
+          koiosUrl,
+          headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+          body: jsonEncode({'_stake_addresses': [stakeAddress]}),
+        );
+        if (koiosResp.statusCode == 200) {
+          final list = jsonDecode(koiosResp.body) as List<dynamic>;
+          if (list.isNotEmpty) {
+            final acc = list.first as Map<String, dynamic>;
+            return {
+              "stake_address": stakeAddress,
+              "active": acc['status'] == 'registered',
+              "controlled_amount": acc['total_balance']?.toString() ?? '0',
+              "rewards_sum": acc['rewards']?.toString() ?? '0',
+              "withdrawals_sum": acc['withdrawals']?.toString() ?? '0',
+              "withdrawable_amount": acc['rewards_available']?.toString() ?? '0',
+              "pool_id": acc['delegated_pool'],
+              "drep_id": acc['delegated_drep'],
+            };
+          }
+        }
+      } catch (_) {}
+    }
 
     if (allowMockFallback || apiKey.contains("DemoApiKey")) {
       // Mock fallback when offline or demo key: returns realistic active stake with rewards
@@ -480,7 +510,8 @@ class BlockfrostClient {
           "Khắc phục: Vui lòng nhấn 'Làm Mới Số Dư' trên Ví Nóng và lập lại giao dịch mới.";
     }
     if (raw.contains("ValueNotConservedUTxO")) {
-      return "Số dư đầu vào không khớp với tổng tiền gửi + tiền thừa + phí mạng.";
+      return "Số dư đầu vào không khớp với tổng tiền gửi + tiền thừa + phí mạng (ValueNotConservedUTxO).\n\n"
+          "Chi tiết mạng: $raw";
     }
     if (raw.contains("MissingVKeyWitnessesUTXOW")) {
       return "Giao dịch thiếu chữ ký xác thực (Witness) từ Ví Lạnh!\n\n"

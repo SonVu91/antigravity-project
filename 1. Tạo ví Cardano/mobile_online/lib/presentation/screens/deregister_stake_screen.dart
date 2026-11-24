@@ -19,6 +19,14 @@ class _DeregisterStakeScreenState extends ConsumerState<DeregisterStakeScreen> {
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      ref.read(hotWalletProvider.notifier).fetchRewardInfo();
+    });
+  }
+
+  @override
   void dispose() {
     _customAddressController.dispose();
     super.dispose();

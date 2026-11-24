@@ -214,15 +214,16 @@ class CardanoPure {
   }
 
   static List<BigInt> _edwardsMul(BigInt k, List<BigInt> pt) {
-    var res = [BigInt.zero, BigInt.one];
+    var res = [BigInt.zero, BigInt.one]; // Điểm trung hòa trên đường cong Edwards (0, 1)
     var cur = pt;
-    var scalar = k;
-    while (scalar > BigInt.zero) {
-      if ((scalar & BigInt.one) == BigInt.one) {
-        res = _edwardsAdd(res, cur);
-      }
+    // Chống tấn công Kênh phụ Đo lường thời gian (Constant-time 256-bit loop):
+    // Luôn lặp đúng 256 bước cố định cho scalar 256-bit của Ed25519, thực thi đầy đủ
+    // cả phép cộng điểm (_edwardsAdd) và nhân đôi (_edwardsAdd(cur, cur)) để không rò rỉ bit của khóa qua timing
+    for (int bitIndex = 0; bitIndex < 256; bitIndex++) {
+      final bit = ((k >> bitIndex) & BigInt.one).toInt();
+      final added = _edwardsAdd(res, cur);
+      res = (bit == 1) ? added : res;
       cur = _edwardsAdd(cur, cur);
-      scalar >>= 1;
     }
     return res;
   }

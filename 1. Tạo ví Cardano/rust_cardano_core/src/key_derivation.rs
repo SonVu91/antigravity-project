@@ -191,8 +191,9 @@ impl KeyDerivator {
         let mut stk_bytes = stake_key.to_raw_bytes().to_vec();
         stk_bytes.zeroize();
 
+        // An toàn bộ nhớ: Không trả lại seed phrase trong chuỗi JSON FFI vì phía Dart/UI đã sở hữu cụm từ này
         Ok(WalletKeysInfo {
-            mnemonic: phrase.to_string(),
+            mnemonic: String::new(),
             payment_address: payment_addr,
             stake_address: stake_reward_addr,
             account_xpub_hex,

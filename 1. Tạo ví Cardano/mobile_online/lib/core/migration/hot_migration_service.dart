@@ -5,7 +5,7 @@ import '../models/watched_wallet_entry.dart';
 
 class HotMigrationService {
   static const int currentSchemaVersion = 3;
-  static const String appVersion = "2.0.16";
+  static const String appVersion = "2.0.17";
 
   static const String keySchemaVersion = 'hot_schema_version';
   static const String keyAppVersion = 'hot_app_version';

@@ -1,4 +1,5 @@
 import 'package:convert/convert.dart';
+import 'package:cardano_airgap_bridge/cardano_airgap_bridge.dart';
 import '../network/token_asset.dart';
 import '../network/cardano_address_helper.dart';
 
@@ -87,12 +88,32 @@ class TransactionBuilder {
   static const int minFeeB = 155381;
   static const int minPureAdaChangeLovelace = 1000000; // 1 ADA
 
-  /// Tính toán TTL mặc định an toàn cho kỷ nguyên Conway (Cardano Preprod/Mainnet)
-  /// Tránh lỗi OutsideValidityIntervalUTxO khi TTL rơi vào quá khứ
-  static int calculateDefaultTtl() {
+  /// Tính toán TTL mặc định an toàn cho kỷ nguyên Conway theo từng mạng (Mainnet/Preprod/Preview)
+  /// Tránh lỗi OutsideValidityIntervalUTxO khi TTL rơi vào quá khứ hoặc lệch slot mạng
+  static int calculateDefaultTtl({CardanoNetwork? network, String? address}) {
+    final net = network ??
+        ((address != null && (address.startsWith('addr1') || address.startsWith('stake1')))
+            ? CardanoNetwork.mainnet
+            : CardanoNetwork.preprod);
     final nowSeconds = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
-    final preprodSlot = nowSeconds - 1654041600;
-    final baseSlot = preprodSlot > 138000000 ? preprodSlot : 138556338;
+    final int baseSlot;
+    switch (net) {
+      case CardanoNetwork.mainnet:
+        // Mainnet Shelley slot: Genesis Byron 1506203091, Shelley started at slot 4492800 / timestamp 1596059091 (1 slot/s)
+        final mainnetSlot = nowSeconds - 1596059091 + 4492800;
+        baseSlot = mainnetSlot > 120000000 ? mainnetSlot : 140000000;
+        break;
+      case CardanoNetwork.preview:
+        // Preview Genesis 1666656000
+        final previewSlot = nowSeconds - 1666656000;
+        baseSlot = previewSlot > 40000000 ? previewSlot : 50000000;
+        break;
+      case CardanoNetwork.preprod:
+        // Preprod Genesis 1654041600
+        final preprodSlot = nowSeconds - 1654041600;
+        baseSlot = preprodSlot > 138000000 ? preprodSlot : 138556338;
+        break;
+    }
     return baseSlot + 7200; // Có hiệu lực trong 2 giờ
   }
 
@@ -162,7 +183,7 @@ class TransactionBuilder {
       throw Exception("Ví không có UTXO khả dụng để tạo giao dịch.");
     }
 
-    final effectiveTtl = ttl ?? calculateDefaultTtl();
+    final effectiveTtl = ttl ?? calculateDefaultTtl(address: senderAddress);
 
     // Gom UTXO chọn lọc (Multi-Asset Coin Selection)
     final selectedInputs = <Map<String, dynamic>>[];
@@ -506,7 +527,7 @@ class TransactionBuilder {
       stakeAddress: stakeAddress,
       withdrawLovelace: withdrawLovelace,
       fee: estimatedFee,
-      ttl: ttl ?? calculateDefaultTtl(),
+      ttl: ttl ?? calculateDefaultTtl(address: senderAddress),
       includeDRepDelegation: autoDelegateDRep,
       drepId: drepId,
     );
@@ -592,7 +613,7 @@ class TransactionBuilder {
       withdrawLovelace: safeWithdraw,
       depositRefundLovelace: depositRefundLovelace,
       fee: estimatedFee,
-      ttl: ttl ?? calculateDefaultTtl(),
+      ttl: ttl ?? calculateDefaultTtl(address: senderAddress),
     );
 
     buffer.write(hexPayload);
@@ -704,7 +725,7 @@ class TransactionBuilder {
       drepId: cleanDRep,
       depositLovelace: depositLovelace,
       fee: estimatedFee,
-      ttl: ttl ?? calculateDefaultTtl(),
+      ttl: ttl ?? calculateDefaultTtl(address: senderAddress),
     );
 
     buffer.write(hexPayload);

@@ -82,15 +82,13 @@ class CardanoCoreBridge {
       final possiblePaths = [
         // 1. Thư mục chứa tệp thực thi ứng dụng (An toàn cao nhất)
         '$exeDir\\rust_cardano_core.dll',
-        // 2. Thư mục làm việc hiện tại của tiến trình
-        '$cwd\\rust_cardano_core.dll',
         if (scriptDir != null) '$scriptDir\\rust_cardano_core.dll',
+        // 2. Thư mục cục bộ của dự án trong môi trường phát triển / kiểm thử
+        '$cwd\\rust_cardano_core.dll',
+        '$cwd\\..\\rust_cardano_core.dll',
+        '$cwd\\cardano_airgap_bridge\\rust_cardano_core.dll',
+        '$cwd\\..\\cardano_airgap_bridge\\rust_cardano_core.dll',
         '$cwd\\rust_cardano_core\\target\\release\\rust_cardano_core.dll',
-        // 3. Vị trí build artifact chính thức
-        'E:\\Antigravity\\1. Tạo ví Cardano\\rust_cardano_core.dll',
-        'E:\\ColdWallet_Build\\rust_cardano_core.dll',
-        'E:\\Antigravity\\2. Tạo ví Cardano v2.0\\rust_cardano_core.dll',
-        'E:\\cargo_target\\release\\rust_cardano_core.dll',
       ];
       for (final p in possiblePaths) {
         if (File(p).existsSync()) {
@@ -203,6 +201,7 @@ class CardanoCoreBridge {
       if (map['success'] == true) {
         final data = Map<String, dynamic>.from(map['data'] as Map);
         data['use_icarus'] = useIcarus;
+        data['mnemonic'] = phrase;
         return WalletKeysInfo.fromJson(data);
       } else {
         throw Exception(map['error']);

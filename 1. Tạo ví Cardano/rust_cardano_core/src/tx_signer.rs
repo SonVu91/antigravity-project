@@ -107,9 +107,12 @@ impl TransactionSigner {
         let canonical_body_bytes = tx_body.to_cbor_bytes();
         let tx_hash = blake2b256(&canonical_body_bytes);
 
-        // Tự động nhận diện hoạt động Staking / Chứng chỉ / Rút thưởng để ký tự động Stake Key (Role 2)
+        // Kiểm tra ủy quyền hoạt động Staking / Chứng chỉ / Rút thưởng (Anti-Blind Stake Signing Guard)
         let has_stake_operations = tx_body.certs.is_some() || tx_body.withdrawals.is_some();
-        let should_sign_stake = sign_stake || is_stake_prefix || has_stake_operations;
+        if has_stake_operations && !sign_stake && !is_stake_prefix {
+            return Err("SECURITY_BLOCKED_UNAUTHORIZED_STAKE_SIGNING: Giao dịch chứa thao tác Chứng chỉ/Ủy thác/Rút thưởng nhưng không được người dùng cấp quyền ký Stake Key!".to_string());
+        }
+        let should_sign_stake = sign_stake || is_stake_prefix;
 
         // Tự động nhận diện hoạt động Biểu quyết Quản trị / DRep (Role 3)
         let has_drep_operations = tx_body.voting_procedures.is_some() || tx_body.proposal_procedures.is_some();

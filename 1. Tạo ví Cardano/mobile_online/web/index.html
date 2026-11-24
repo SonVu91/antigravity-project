@@ -19,9 +19,12 @@
   </script>
 
   <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="description" content="Cardano Hot Watch-Only Wallet v2.0.5 (Air-Gap Edition) - Safe offline monitoring and transaction broadcasting for Cardano.">
+  <meta name="description" content="Cardano Hot Watch-Only Wallet v2.0.13 (Air-Gap Edition) - Safe offline monitoring and transaction broadcasting for Cardano.">
 
   <!-- Apple iOS PWA Meta Tags -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -624,6 +627,39 @@
     </div>
   </div>
 
-  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    // Tự động kiểm tra và xóa cache PWA Service Worker cũ khi có bản cập nhật mới
+    (function() {
+      if ('caches' in window) {
+        fetch('version.json?t=' + Date.now())
+          .then(function(r) { return r.json(); })
+          .then(function(ver) {
+            var currentVersion = ver.version + '+' + ver.build_number;
+            var storedVersion = localStorage.getItem('cardano_hot_wallet_version');
+            if (storedVersion && storedVersion !== currentVersion) {
+              console.log('[CacheBuster] Phát hiện phiên bản mới: ' + currentVersion + ' (cũ: ' + storedVersion + '). Đang làm mới cache...');
+              localStorage.setItem('cardano_hot_wallet_version', currentVersion);
+              caches.keys().then(function(keys) {
+                return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+              }).then(function() {
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistrations().then(function(regs) {
+                    return Promise.all(regs.map(function(r) { return r.unregister(); }));
+                  }).then(function() {
+                    window.location.reload();
+                  });
+                } else {
+                  window.location.reload();
+                }
+              });
+            } else {
+              localStorage.setItem('cardano_hot_wallet_version', currentVersion);
+            }
+          })
+          .catch(function(err) {});
+      }
+    })();
+  </script>
+  <script src="flutter_bootstrap.js?v=2.0.13" async></script>
 </body>
 </html>

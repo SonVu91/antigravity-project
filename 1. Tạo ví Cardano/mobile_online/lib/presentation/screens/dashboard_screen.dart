@@ -256,7 +256,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Ví Nóng Cardano v2.0.17"),
+        title: const Text("Ví Nóng Cardano v2.0.18"),
         actions: [
           IconButton(
             tooltip: "Quản lý danh sách ví & Portfolio",

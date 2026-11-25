@@ -77,25 +77,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72f5acc6cb2ba439de613abc23857ec3d78374d8ed5ac84e9d11336e87da8649"
 
 [[package]]
-name = "cardano-multiplatform-lib"
-version = "6.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3a4b8c998c8f27ea19fa57fbda02f1f3d105bf1e74b7c6d8360a75a57573d49"
-dependencies = [
- "cbor_event",
- "cml-chain-wasm",
- "cml-cip25-wasm",
- "cml-cip36-wasm",
- "cml-core-wasm",
- "cml-crypto-wasm",
- "hex",
- "linked-hash-map",
- "serde-wasm-bindgen",
- "serde_json",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "cbor_event"
 version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -158,103 +139,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "unicode-segmentation",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "cml-chain-wasm"
-version = "6.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0f45e8769a031a136d041c6c53064ab73809d525d69b5e5f50a330b3ea4e3c6"
-dependencies = [
- "cbor_event",
- "cml-chain",
- "cml-core",
- "cml-core-wasm",
- "cml-crypto",
- "cml-crypto-wasm",
- "hex",
- "linked-hash-map",
- "serde-wasm-bindgen",
- "serde_json",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "cml-cip25"
-version = "6.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b5a1c9cf8b7c2b85ac689295aebb284591dda36e8302c3dee4d6012fe6247af"
-dependencies = [
- "cbor_event",
- "cml-chain",
- "cml-core",
- "cml-crypto",
- "hex",
- "schemars",
- "serde",
- "serde_json",
- "thiserror",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "cml-cip25-wasm"
-version = "6.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a266610e870568d96e593102f9319b378589f6311c34fc1e07c4a5982e88783"
-dependencies = [
- "cbor_event",
- "cml-chain",
- "cml-chain-wasm",
- "cml-cip25",
- "cml-core",
- "cml-core-wasm",
- "hex",
- "linked-hash-map",
- "serde-wasm-bindgen",
- "serde_json",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "cml-cip36"
-version = "6.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68236c48db3677b070590e3308f49388683f41ab1cfce6271ee3fe73881cda15"
-dependencies = [
- "cbor_event",
- "cml-chain",
- "cml-core",
- "cml-crypto",
- "derivative",
- "hex",
- "linked-hash-map",
- "schemars",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "cml-cip36-wasm"
-version = "6.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "814c55b5a4a7b673323fdd1a2e5b72fe5f5e89c6e9b6cce827ce9b743bc5607d"
-dependencies = [
- "cbor_event",
- "cml-chain",
- "cml-chain-wasm",
- "cml-cip36",
- "cml-core",
- "cml-core-wasm",
- "cml-crypto",
- "cml-crypto-wasm",
- "hex",
- "linked-hash-map",
- "serde-wasm-bindgen",
- "serde_json",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -283,21 +167,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cml-core-wasm"
-version = "6.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "301d4e59132aef521100612b0d91a152570662b62f6e9c14099fa8170504e9f7"
-dependencies = [
- "cbor_event",
- "cml-core",
- "hex",
- "linked-hash-map",
- "serde-wasm-bindgen",
- "serde_json",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "cml-crypto"
 version = "6.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -319,20 +188,6 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror",
-]
-
-[[package]]
-name = "cml-crypto-wasm"
-version = "6.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87d28b0b72be2b089b4806a079216c4f810e6f9ddb4c6c2e4fecc0c6125b0778"
-dependencies = [
- "cbor_event",
- "cml-core-wasm",
- "cml-crypto",
- "linked-hash-map",
- "serde_json",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -760,7 +615,6 @@ name = "rust_cardano_core"
 version = "2.0.0"
 dependencies = [
  "bip39",
- "cardano-multiplatform-lib",
  "cml-chain",
  "cml-core",
  "cml-crypto",
@@ -810,17 +664,6 @@ checksum = "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba"
 dependencies = [
  "serde_core",
  "serde_derive",
-]
-
-[[package]]
-name = "serde-wasm-bindgen"
-version = "0.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3b4c031cd0d9014307d82b8abf653c0290fbdaeb4c02d00c63cf52f728628bf"
-dependencies = [
- "js-sys",
- "serde",
- "wasm-bindgen",
 ]
 
 [[package]]

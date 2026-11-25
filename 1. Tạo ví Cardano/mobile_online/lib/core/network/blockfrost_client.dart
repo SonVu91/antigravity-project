@@ -515,7 +515,8 @@ class BlockfrostClient {
     }
     if (raw.contains("MissingVKeyWitnessesUTXOW")) {
       return "Giao dịch thiếu chữ ký xác thực (Witness) từ Ví Lạnh!\n\n"
-          "Khắc phục: Giao dịch này yêu cầu cơ chế ký kép (Payment Key + Stake Key). Vui lòng đảm bảo bạn đã dùng đúng Ví Lạnh và bản cập nhật v2.0.7 để ký giao dịch.";
+          "Nguyên nhân: Một hoặc nhiều UTXO đầu vào (hoặc chứng chỉ/lệnh rút thưởng) chưa được ký bởi khóa tương ứng từ Ví Lạnh.\n\n"
+          "Khắc phục: Vui lòng đảm bảo bạn đã dùng đúng Ví Lạnh và bản cập nhật mới nhất hỗ trợ ký đa nhánh UTXO (Multi-Branch Signing) để ký giao dịch.";
     }
     if (raw.contains("FeeTooSmallUTxO")) {
       return "Mức phí giao dịch nhỏ hơn phí tối thiểu yêu cầu bởi giao thức Cardano Conway.";

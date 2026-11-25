@@ -227,7 +227,13 @@ class CardanoCoreBridge {
     init();
     if (_lib != null) {
       final freeFn = _lib!.lookupFunction<_CardanoFreeStrC, _CardanoFreeStrDart>('cardano_core_free_string');
-      final pCbor = cborHex.toNativeUtf8();
+      final cborPart = cborHex.contains("|inputs:") ? cborHex.split("|inputs:").first : cborHex;
+      final cleanHex = cborPart
+          .replaceAll("TxBodyConwayWithdrawal:", "")
+          .replaceAll("TxBodyConwayDelegation:", "")
+          .replaceAll("TxBodyConway:", "")
+          .trim();
+      final pCbor = cleanHex.toNativeUtf8();
       final pXpub = (accountXpubHex ?? '').toNativeUtf8();
       Pointer<Utf8> ptr = nullptr;
       String jsonStr = '';
@@ -332,6 +338,19 @@ class CardanoCoreBridge {
       if (map['success'] == true) {
         return map['data'] as String;
       } else {
+        final err = map['error']?.toString() ?? '';
+        if (err.contains("Invalid character '|'") && cborHex.contains("|inputs:")) {
+          return signTransaction(
+            cborHex.split("|inputs:").first,
+            mnemonic,
+            passphrase: passphrase,
+            signStake: signStake,
+            accountIndex: accountIndex,
+            addressIndex: addressIndex,
+            isTestnet: isTestnet,
+            useIcarus: useIcarus,
+          );
+        }
         throw Exception(map['error']);
       }
     }

@@ -9,7 +9,6 @@ authors = ["Cardano Air-Gap Team"]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-cardano-multiplatform-lib = "6.2.0"
 cml-chain = "6.2.0"
 cml-crypto = "6.2.0"
 cml-core = "6.2.0"

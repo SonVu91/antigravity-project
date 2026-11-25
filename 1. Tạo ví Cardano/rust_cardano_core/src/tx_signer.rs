@@ -1,9 +1,12 @@
 use cml_chain::transaction::{Transaction, TransactionBody, TransactionWitnessSet};
 use cml_chain::crypto::Vkeywitness;
+use cml_chain::address::BaseAddress;
+use cml_chain::certs::StakeCredential;
 use cml_core::serialization::{Deserialize, Serialize};
 use cml_crypto::{blake2b256, RawBytesEncoding};
 use crate::key_derivation::KeyDerivator;
 use crate::secure_zeroize;
+use std::collections::HashMap;
 
 pub struct TransactionSigner;
 
@@ -39,7 +42,12 @@ impl TransactionSigner {
         use_icarus: bool,
     ) -> Result<String, String> {
         let trimmed = cbor_hex.trim();
-        let clean_hex = trimmed
+        let (cbor_part, _inputs_part) = match trimmed.split_once("|inputs:") {
+            Some((cbor, inputs)) => (cbor, Some(inputs)),
+            None => (trimmed, None),
+        };
+
+        let clean_hex = cbor_part
             .trim_start_matches("TxBodyConway:")
             .trim_start_matches("TxBodyConwayWithdrawal:")
             .trim_start_matches("TxBodyConwayDelegation:")
@@ -89,10 +97,15 @@ impl TransactionSigner {
         use_icarus: bool,
     ) -> Result<String, String> {
         let trimmed = cbor_hex.trim();
-        let is_stake_prefix = trimmed.starts_with("TxBodyConwayWithdrawal:")
-            || trimmed.starts_with("TxBodyConwayDelegation:");
+        let (cbor_part, inputs_part) = match trimmed.split_once("|inputs:") {
+            Some((cbor, inputs)) => (cbor, Some(inputs)),
+            None => (trimmed, None),
+        };
 
-        let clean_hex = trimmed
+        let is_stake_prefix = cbor_part.starts_with("TxBodyConwayWithdrawal:")
+            || cbor_part.starts_with("TxBodyConwayDelegation:");
+
+        let clean_hex = cbor_part
             .trim_start_matches("TxBodyConway:")
             .trim_start_matches("TxBodyConwayWithdrawal:")
             .trim_start_matches("TxBodyConwayDelegation:")
@@ -203,26 +216,92 @@ impl TransactionSigner {
             return Err(format!("SECURITY_BLOCKED_BY_CHANGE_GUARD: {}", warning));
         }
 
-        let raw_payment_private = payment_key.to_raw_key();
-        let raw_payment_public = payment_key.to_public().to_raw_key();
+        // Tự động nhận diện danh sách các khóa UTXO cần ký từ inputs_part (Multi-Branch UTXO Signing)
+        let mut keys_to_sign: Vec<(u32, u32)> = Vec::new();
 
-        // Ký bằng Payment Key
-        let payment_sig = raw_payment_private.sign(&tx_hash);
+        if let Some(inputs_str) = inputs_part {
+            let input_addrs: Vec<&str> = inputs_str
+                .split(',')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect();
 
-        // Chốt chặn chống Fault Injection / Rowhammer (FIPS 140-3 Self-Verification):
-        // Bắt buộc xác minh chữ ký vừa tạo với khóa công khai tương ứng trước khi xuất
-        if !raw_payment_public.verify(&tx_hash, &payment_sig) {
-            let mut pay_prv_bytes = raw_payment_private.to_raw_bytes().to_vec();
-            secure_zeroize(&mut pay_prv_bytes);
-            return Err("CRITICAL_CRYPTO_FAULT: Chữ ký Payment Ed25519 không hợp lệ khi tự kiểm tra (Fault Injection Guard)!".to_string());
+            if !input_addrs.is_empty() {
+                let network_id = if is_testnet { 0 } else { 1 };
+                let stake_pub = account_xpub.derive(2)
+                    .map_err(|e| format!("Lỗi derive stake role 2: {:?}", e))?
+                    .derive(0)
+                    .map_err(|e| format!("Lỗi derive stake index 0: {:?}", e))?;
+                let stake_key_hash = stake_pub.to_raw_key().hash();
+
+                let mut addr_map: HashMap<String, (u32, u32)> = HashMap::new();
+
+                for role in [0u32, 1u32] {
+                    if let Ok(role_pub) = account_xpub.derive(role) {
+                        for idx in 0..20 {
+                            if let Ok(k_pub) = role_pub.derive(idx) {
+                                let pay_hash = k_pub.to_raw_key().hash();
+                                let base = BaseAddress::new(
+                                    network_id,
+                                    StakeCredential::new_pub_key(pay_hash),
+                                    StakeCredential::new_pub_key(stake_key_hash),
+                                );
+                                if let Ok(bech) = base.to_address().to_bech32(None) {
+                                    addr_map.insert(bech, (role, idx));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                for in_addr in &input_addrs {
+                    if let Some(&(role, idx)) = addr_map.get(*in_addr) {
+                        if !keys_to_sign.contains(&(role, idx)) {
+                            keys_to_sign.push((role, idx));
+                        }
+                    } else {
+                        // Chốt chặn Fail-Closed: Từ chối ký và chặn đứng nếu có bất kỳ UTXO nào không thuộc ví
+                        return Err(format!(
+                            "SECURITY_BLOCKED_FOREIGN_INPUT: Phát hiện địa chỉ đầu vào '{}' không thuộc tài khoản này! Giao dịch bị từ chối để bảo vệ an toàn.",
+                            in_addr
+                        ));
+                    }
+                }
+            }
         }
 
-        let payment_witness = Vkeywitness::new(
-            cml_chain::crypto::Vkey::from(raw_payment_public),
-            payment_sig,
-        );
+        if keys_to_sign.is_empty() {
+            keys_to_sign.push((0, address_index));
+        }
 
-        let mut vkeys = vec![payment_witness];
+        let mut vkeys: Vec<Vkeywitness> = Vec::new();
+
+        for (role, idx) in keys_to_sign {
+            let derived_key = account.derive(role).derive(idx);
+
+            let raw_private = derived_key.to_raw_key();
+            let raw_public = derived_key.to_public().to_raw_key();
+
+            let sig = raw_private.sign(&tx_hash);
+
+            // Chốt chặn chống Fault Injection / Rowhammer (FIPS 140-3 Self-Verification)
+            if !raw_public.verify(&tx_hash, &sig) {
+                let mut prv_bytes = raw_private.to_raw_bytes().to_vec();
+                secure_zeroize(&mut prv_bytes);
+                return Err("CRITICAL_CRYPTO_FAULT: Chữ ký Ed25519 không hợp lệ khi tự kiểm tra (Fault Injection Guard)!".to_string());
+            }
+
+            let witness = Vkeywitness::new(
+                cml_chain::crypto::Vkey::from(raw_public),
+                sig,
+            );
+            vkeys.push(witness);
+
+            let mut prv_bytes = raw_private.to_raw_bytes().to_vec();
+            secure_zeroize(&mut prv_bytes);
+            let mut key_bytes = derived_key.to_raw_bytes().to_vec();
+            secure_zeroize(&mut key_bytes);
+        }
 
         // 1. Ký thêm bằng Stake Key nếu là giao dịch ủy thác (Delegation) hoặc rút thưởng (Withdrawal)
         if should_sign_stake {
@@ -294,8 +373,6 @@ impl TransactionSigner {
         secure_zeroize(&mut account_bytes);
         let mut payment_bytes = payment_key.to_raw_bytes().to_vec();
         secure_zeroize(&mut payment_bytes);
-        let mut raw_payment_bytes = raw_payment_private.to_raw_bytes().to_vec();
-        secure_zeroize(&mut raw_payment_bytes);
 
         let mut witness_set = TransactionWitnessSet::new();
         witness_set.vkeywitnesses = Some(unique_vkeys.into());

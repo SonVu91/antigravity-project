@@ -236,6 +236,13 @@ class TransactionBuilder {
       final distinctKeys = selectedInputs.map((u) => u['source_address'] ?? senderAddress).toSet().length;
       final witnessCount = distinctKeys > 0 ? distinctKeys : 1;
 
+      final distinctSourceAddrs = selectedInputs
+          .map((u) => (u['source_address'] as String?)?.trim() ?? senderAddress)
+          .where((addr) => addr.isNotEmpty)
+          .toSet()
+          .toList();
+      final inputsSuffix = distinctSourceAddrs.isNotEmpty ? "|inputs:${distinctSourceAddrs.join(',')}" : "";
+
       // Lượt 1: Dự toán phí nháp
       int draftFee = 180000 + (selectedInputs.length - 1) * 15000;
       int draftSend = accumulatedLovelace - draftFee;
@@ -283,7 +290,7 @@ class TransactionBuilder {
 
       final inputsUsed = selectedInputs.map((u) => "${u['tx_hash']}#${u['tx_index']}").toList();
       return BuiltTxResult(
-        rawCborHex: "TxBodyConway:$finalPayload",
+        rawCborHex: "TxBodyConway:$finalPayload$inputsSuffix",
         feeLovelace: exactFee,
         sendLovelace: finalSendLovelace,
         changeLovelace: 0,
@@ -412,6 +419,13 @@ class TransactionBuilder {
     final distinctKeys = selectedInputs.map((u) => u['source_address'] ?? senderAddress).toSet().length;
     final witnessCount = distinctKeys > 0 ? distinctKeys : 1;
 
+    final distinctSourceAddrs = selectedInputs
+        .map((u) => (u['source_address'] as String?)?.trim() ?? senderAddress)
+        .where((addr) => addr.isNotEmpty)
+        .toSet()
+        .toList();
+    final inputsSuffix = distinctSourceAddrs.isNotEmpty ? "|inputs:${distinctSourceAddrs.join(',')}" : "";
+
     final draftPayload = _generateConwayMultiAssetCborHex(
       selectedInputs: selectedInputs,
       recipientAddress: recipientAddress,
@@ -452,7 +466,7 @@ class TransactionBuilder {
     final inputsUsed = selectedInputs.map((u) => "${u['tx_hash']}#${u['tx_index']}").toList();
 
     return BuiltTxResult(
-      rawCborHex: "TxBodyConway:$finalPayload",
+      rawCborHex: "TxBodyConway:$finalPayload$inputsSuffix",
       feeLovelace: finalFee,
       sendLovelace: effectiveSendLovelace,
       changeLovelace: finalChangeLovelace,
@@ -533,6 +547,10 @@ class TransactionBuilder {
     );
 
     buffer.write(hexPayload);
+    final inputAddr = (selectedInput['source_address'] as String?)?.trim() ?? senderAddress;
+    if (inputAddr.isNotEmpty) {
+      buffer.write("|inputs:$inputAddr");
+    }
 
     return BuiltTxResult(
       rawCborHex: buffer.toString(),
@@ -617,6 +635,10 @@ class TransactionBuilder {
     );
 
     buffer.write(hexPayload);
+    final inputAddr = (selectedInput['source_address'] as String?)?.trim() ?? senderAddress;
+    if (inputAddr.isNotEmpty) {
+      buffer.write("|inputs:$inputAddr");
+    }
 
     return BuiltTxResult(
       rawCborHex: buffer.toString(),
@@ -729,6 +751,14 @@ class TransactionBuilder {
     );
 
     buffer.write(hexPayload);
+    final distinctSourceAddrs = selectedInputs
+        .map((u) => (u['source_address'] as String?)?.trim() ?? senderAddress)
+        .where((addr) => addr.isNotEmpty)
+        .toSet()
+        .toList();
+    if (distinctSourceAddrs.isNotEmpty) {
+      buffer.write("|inputs:${distinctSourceAddrs.join(',')}");
+    }
 
     return BuiltTxResult(
       rawCborHex: buffer.toString(),

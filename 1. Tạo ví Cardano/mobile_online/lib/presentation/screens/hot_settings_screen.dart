@@ -312,7 +312,7 @@ class _HotSettingsScreenState extends ConsumerState<HotSettingsScreen> {
                           children: [
                             Text("Phiên Bản Ứng Dụng", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                             Chip(
-                              label: const Text("v2.0.17 (Build 18)", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              label: const Text("v2.0.18 (Build 19)", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                               backgroundColor: HotTheme.primary,
                             ),
                           ],

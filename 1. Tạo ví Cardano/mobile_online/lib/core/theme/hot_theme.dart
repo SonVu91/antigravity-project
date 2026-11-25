@@ -52,7 +52,7 @@ class HotTheme {
           textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
         ),
       ),
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         color: cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),

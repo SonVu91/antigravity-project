@@ -70,10 +70,15 @@ impl TransactionParser {
         known_active_address: Option<&str>,
     ) -> Result<ParsedTransaction, String> {
         let trimmed_input = cbor_hex.trim();
-        let is_withdrawal_prefix = trimmed_input.starts_with("TxBodyConwayWithdrawal:");
-        let is_delegation_prefix = trimmed_input.starts_with("TxBodyConwayDelegation:");
+        let (cbor_part, _inputs_part) = match trimmed_input.split_once("|inputs:") {
+            Some((cbor, inputs)) => (cbor, Some(inputs)),
+            None => (trimmed_input, None),
+        };
 
-        let clean_hex = trimmed_input
+        let is_withdrawal_prefix = cbor_part.starts_with("TxBodyConwayWithdrawal:");
+        let is_delegation_prefix = cbor_part.starts_with("TxBodyConwayDelegation:");
+
+        let clean_hex = cbor_part
             .trim_start_matches("TxBodyConway:")
             .trim_start_matches("TxBodyConwayWithdrawal:")
             .trim_start_matches("TxBodyConwayDelegation:")

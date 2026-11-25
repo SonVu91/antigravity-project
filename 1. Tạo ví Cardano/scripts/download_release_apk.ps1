@@ -2,13 +2,13 @@
 
 $repoOwner = "SonVu91"
 $repoName = "antigravity-project"
-$tag = "v2.0.17"
+$tag = "v2.0.18"
 $apksToDownload = @(
-    "cardano-hot-wallet-v2.0.17-universal.apk",
-    "cardano-hot-wallet-v2.0.17-armv7.apk",
-    "cardano-hot-wallet-v2.0.17-arm64.apk",
-    "cardano-hot-wallet-web-v2.0.17.zip",
-    "SHA256SUMS-v2.0.17.txt"
+    "cardano-hot-wallet-v2.0.18-universal.apk",
+    "cardano-hot-wallet-v2.0.18-armv7.apk",
+    "cardano-hot-wallet-v2.0.18-arm64.apk",
+    "cardano-hot-wallet-web-v2.0.18.zip",
+    "SHA256SUMS-v2.0.18.txt"
 )
 
 $outputDir = Join-Path $PSScriptRoot "..\output"
@@ -58,30 +58,30 @@ if ($releaseInfo -and $releaseInfo.assets) {
         }
     }
     
-    $universalCold = Join-Path $outputDir "cardano-cold-wallet-v2.0.17-universal.apk"
-    $standardCold = Join-Path $outputDir "cardano-cold-wallet-v2.0.17.apk"
+    $universalCold = Join-Path $outputDir "cardano-cold-wallet-v2.0.18-universal.apk"
+    $standardCold = Join-Path $outputDir "cardano-cold-wallet-v2.0.18.apk"
     if (Test-Path $universalCold) {
         Copy-Item -Path $universalCold -Destination $standardCold -Force
-        Copy-Item -Path $universalCold -Destination (Join-Path $versionDir "cardano-cold-wallet-v2.0.17.apk") -Force
-        Copy-Item -Path $universalCold -Destination (Join-Path $versionApkDir "cardano-cold-wallet-v2.0.17.apk") -Force
-        Write-Host "[v] Da tao ban Universal mac dinh: cardano-cold-wallet-v2.0.17.apk" -ForegroundColor Green
+        Copy-Item -Path $universalCold -Destination (Join-Path $versionDir "cardano-cold-wallet-v2.0.18.apk") -Force
+        Copy-Item -Path $universalCold -Destination (Join-Path $versionApkDir "cardano-cold-wallet-v2.0.18.apk") -Force
+        Write-Host "[v] Da tao ban Universal mac dinh: cardano-cold-wallet-v2.0.18.apk" -ForegroundColor Green
     }
 
-    $universalHot = Join-Path $outputDir "cardano-hot-wallet-v2.0.17-universal.apk"
-    $standardHot = Join-Path $outputDir "cardano-hot-wallet-v2.0.17.apk"
+    $universalHot = Join-Path $outputDir "cardano-hot-wallet-v2.0.18-universal.apk"
+    $standardHot = Join-Path $outputDir "cardano-hot-wallet-v2.0.18.apk"
     if (Test-Path $universalHot) {
         Copy-Item -Path $universalHot -Destination $standardHot -Force
-        Copy-Item -Path $universalHot -Destination (Join-Path $versionDir "cardano-hot-wallet-v2.0.17.apk") -Force
-        Copy-Item -Path $universalHot -Destination (Join-Path $versionApkDir "cardano-hot-wallet-v2.0.17.apk") -Force
-        Write-Host "[v] Da tao ban Universal mac dinh: cardano-hot-wallet-v2.0.17.apk" -ForegroundColor Green
+        Copy-Item -Path $universalHot -Destination (Join-Path $versionDir "cardano-hot-wallet-v2.0.18.apk") -Force
+        Copy-Item -Path $universalHot -Destination (Join-Path $versionApkDir "cardano-hot-wallet-v2.0.18.apk") -Force
+        Write-Host "[v] Da tao ban Universal mac dinh: cardano-hot-wallet-v2.0.18.apk" -ForegroundColor Green
     }
 
     # Extract Web Bundle if present
-    $hotWebZip = Join-Path $outputDir "cardano-hot-wallet-web-v2.0.17.zip"
+    $hotWebZip = Join-Path $outputDir "cardano-hot-wallet-web-v2.0.18.zip"
     if (Test-Path $hotWebZip) {
         $hotWebDest = Join-Path $outputDir "web_hot_wallet"
         Expand-Archive -Path $hotWebZip -DestinationPath $hotWebDest -Force
-        Write-Host "[v] Da giai nen Web Hot Wallet v2.0.17 vao output\web_hot_wallet" -ForegroundColor Green
+        Write-Host "[v] Da giai nen Web Hot Wallet v2.0.18 vao output\web_hot_wallet" -ForegroundColor Green
     }
     
     Write-Host "Toan bo file da duoc luu tai thu muc: $outputDir va $versionDir" -ForegroundColor Cyan

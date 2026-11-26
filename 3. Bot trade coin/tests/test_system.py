@@ -428,6 +428,38 @@ class TestCardanoMidnightSentinel(unittest.IsolatedAsyncioTestCase):
         self.assertLessEqual(analysis["z_score"], -1.5)
         self.assertIn("🟢 ĐIỂM ĐẸP TÍCH LŨY NIGHT", analysis["recommendation"])
 
+    async def test_19_interactive_menu_bot(self):
+        """Test interactive Menu Bot and callback navigation"""
+        from unittest.mock import AsyncMock, MagicMock
+        from src.bot.telegram_bot import TelegramSentinelBot
+
+        executor = StrategyExecutor()
+        bot = TelegramSentinelBot(executor)
+
+        # Mock update for /menu
+        update = MagicMock()
+        update.message = AsyncMock()
+        update.callback_query = None
+
+        await bot.cmd_menu(update, context=MagicMock())
+        update.message.reply_text.assert_called_once()
+        args, kwargs = update.message.reply_text.call_args
+        self.assertIn("BẢNG ĐIỀU KHIỂN TRUNG TÂM", args[0])
+        self.assertIsNotNone(kwargs.get("reply_markup"))
+
+        # Mock callback query for 'main_menu' button under charts
+        cb_update = MagicMock()
+        cb_update.message = None
+        cb_query = AsyncMock()
+        cb_query.data = "main_menu"
+        cb_query.message = AsyncMock()
+        cb_update.callback_query = cb_query
+
+        await bot.handle_callback(cb_update, context=MagicMock())
+        cb_query.message.reply_text.assert_called_once()
+        cb_args, _ = cb_query.message.reply_text.call_args
+        self.assertIn("BẢNG ĐIỀU KHIỂN TRUNG TÂM", cb_args[0])
+
 
 if __name__ == "__main__":
     unittest.main()

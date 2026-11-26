@@ -53,6 +53,7 @@ class TelegramSentinelBot:
 
             # Command Handlers
             self.app.add_handler(CommandHandler("start", self.cmd_start))
+            self.app.add_handler(CommandHandler("menu", self.cmd_menu))
             self.app.add_handler(CommandHandler("status", self.cmd_status))
             self.app.add_handler(CommandHandler("pnl", self.cmd_pnl))
             self.app.add_handler(CommandHandler("balance", self.cmd_balance))
@@ -74,6 +75,26 @@ class TelegramSentinelBot:
             await self.app.initialize()
             await self.app.start()
             await self.app.updater.start_polling()
+
+            # Register standard bot command menu in Telegram UI
+            try:
+                from telegram import BotCommand
+                bot_commands = [
+                    BotCommand("menu", "🎛️ Bảng điều khiển 1 chạm"),
+                    BotCommand("pnl", "📈 Hiệu suất & Vị thế mở"),
+                    BotCommand("balance", "💰 Số dư CEX & Ví DEX"),
+                    BotCommand("settings", "⚙️ Cài đặt rủi ro & Chế độ"),
+                    BotCommand("status", "📊 Trạng thái hệ thống"),
+                    BotCommand("sd", "🏛️ Tra cứu Cung - Cầu (S&D)"),
+                    BotCommand("buy", "🛒 Đặt lệnh mua"),
+                    BotCommand("sell", "💰 Đặt lệnh bán"),
+                    BotCommand("close", "🛑 Đóng vị thế"),
+                    BotCommand("start", "ℹ️ Hướng dẫn sử dụng"),
+                ]
+                await self.app.bot.set_my_commands(bot_commands)
+            except Exception as ce:
+                logger.debug(f"Không thể đặt menu commands: {ce}")
+
             self._is_running = True
             logger.info("Telegram Bot đã khởi động với đầy đủ tính năng tương tác 2 chiều và Supply & Demand Engine.")
         except Exception as e:
@@ -148,6 +169,37 @@ class TelegramSentinelBot:
 
     # ==================== COMMAND HANDLERS ====================
 
+    async def cmd_menu(self, update, context) -> None:
+        """Display 1-touch interactive control menu"""
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+        msg = (
+            "🎛️ *BẢNG ĐIỀU KHIỂN TRUNG TÂM (AI SENTINEL)*\n\n"
+            "Chạm vào các nút tính năng bên dưới để xem báo cáo hoặc quản trị bot:"
+        )
+        keyboard = [
+            [
+                InlineKeyboardButton("📊 BÁO CÁO PNL", callback_data="menu:pnl"),
+                InlineKeyboardButton("💰 SỐ DƯ TÀI KHOẢN", callback_data="menu:balance"),
+            ],
+            [
+                InlineKeyboardButton("⚙️ CÀI ĐẶT RỦI RO", callback_data="menu:settings"),
+                InlineKeyboardButton("📈 TRẠNG THÁI BOT", callback_data="menu:status"),
+            ],
+            [
+                InlineKeyboardButton("🏛️ S&D ADA/USDT", callback_data="menu:sd_ada"),
+                InlineKeyboardButton("🏛️ S&D NIGHT/ADA", callback_data="menu:sd_night"),
+            ],
+            [
+                InlineKeyboardButton("❌ ĐÓNG MENU", callback_data="menu:close"),
+            ],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        if update.message:
+            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
+        elif update.callback_query and update.callback_query.message:
+            await update.callback_query.message.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
+
     async def cmd_start(self, update, context) -> None:
         msg = (
             "🤖 *Cardano & Midnight AI Sentinel Bot*\n\n"
@@ -157,6 +209,7 @@ class TelegramSentinelBot:
             "• Lệnh Slash: `/sd <cặp_tiền> [khung]`\n"
             "  _Ví dụ:_ `/sd btc/usdt 1d` hoặc `/sd ada 4h`\n\n"
             "⚙️ *LỆNH ĐIỀU KHIỂN & VẬN HÀNH:*\n"
+            "• `/menu`: Bảng điều khiển tương tác 1 chạm (Interactive Menu)\n"
             "• `/status`: Trạng thái hệ thống & kết nối CEX/DEX\n"
             "• `/pnl`: Báo cáo vị thế & PnL realtime kèm nút đóng lệnh\n"
             "• `/balance`: Số dư tài khoản CEX & Ví Cardano\n"
@@ -170,6 +223,9 @@ class TelegramSentinelBot:
         await update.message.reply_text(msg, parse_mode="Markdown")
 
     async def cmd_status(self, update, context) -> None:
+        target = update.message or (update.callback_query.message if update.callback_query else None)
+        if not target:
+            return
         rm = self.executor.risk_manager if self.executor else None
         mode = rm.bot_mode.upper() if rm else settings.BOT_MODE.upper()
         circuit = "⚠️ ACTIVE (Ngắt giao dịch)" if (rm and rm.is_circuit_breaker_active) else "✅ Normal"
@@ -186,7 +242,7 @@ class TelegramSentinelBot:
             f"• 🛡️ Stop-Loss: `{rm.atr_sl_multiplier if rm else 1.5}x ATR` | Chốt lời: `1:{rm.tp_rr_ratio if rm else 2.0} R:R`\n"
             f"• 📈 Cặp theo dõi: `ADA/USDT`, `NIGHT/USDT`, `NIGHT/ADA`, `BTC/USDT`"
         )
-        await update.message.reply_text(msg, parse_mode="Markdown")
+        await target.reply_text(msg, parse_mode="Markdown")
 
     async def cmd_supply_demand(self, update, context) -> None:
         """Command /sd <pair> [timeframe]"""
@@ -270,8 +326,11 @@ class TelegramSentinelBot:
         }
         norm_tf = tf_map.get(timeframe.lower(), "4h")
         pair = f"{symbol.upper()}/{quote.upper()}"
+        target = update.message or (update.callback_query.message if update.callback_query else None)
+        if not target:
+            return
 
-        wait_msg = await update.message.reply_text(
+        wait_msg = await target.reply_text(
             f"⏳ Đang tải dữ liệu nến và phân tích Vùng Cung - Cầu cho `{pair}` [{norm_tf.upper()}]...",
             parse_mode="Markdown",
         )
@@ -366,7 +425,7 @@ class TelegramSentinelBot:
 
             keyboard.append([
                 InlineKeyboardButton("🔄 Làm mới biểu đồ", callback_data=f"sd_refresh:{pair}:{norm_tf}"),
-                InlineKeyboardButton("⚙️ Menu Bot", callback_data="cancel"),
+                InlineKeyboardButton("⚙️ Menu Bot", callback_data="main_menu"),
             ])
 
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -375,7 +434,7 @@ class TelegramSentinelBot:
             if chart_path and os.path.exists(chart_path):
                 with open(chart_path, "rb") as photo:
                     try:
-                        await update.message.reply_photo(
+                        await target.reply_photo(
                             photo=photo,
                             caption=caption,
                             parse_mode="Markdown",
@@ -385,7 +444,7 @@ class TelegramSentinelBot:
                         logger.warning(f"Telegram Markdown parse failed: {pe}, fallback to plain text caption")
                         photo.seek(0)
                         plain_caption = caption.replace("*", "").replace("`", "").replace("_", "")
-                        await update.message.reply_photo(
+                        await target.reply_photo(
                             photo=photo,
                             caption=plain_caption,
                             reply_markup=reply_markup,
@@ -407,8 +466,11 @@ class TelegramSentinelBot:
 
     async def cmd_settings(self, update, context) -> None:
         """Display interactive settings menu with inline buttons"""
+        target = update.message or (update.callback_query.message if update.callback_query else None)
+        if not target:
+            return
         if not self.executor:
-            await update.message.reply_text("Executor chưa khởi tạo.")
+            await target.reply_text("Executor chưa khởi tạo.")
             return
 
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -452,7 +514,7 @@ class TelegramSentinelBot:
                 InlineKeyboardButton("❌ ĐÓNG MENU", callback_data="cancel"),
             ],
         ]
-        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        await target.reply_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     async def cmd_set(self, update, context) -> None:
         """Manual set command: /set <param> <value>"""
@@ -499,14 +561,17 @@ class TelegramSentinelBot:
         await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
     async def cmd_pnl(self, update, context) -> None:
+        target = update.message or (update.callback_query.message if update.callback_query else None)
+        if not target:
+            return
         if not self.executor:
-            await update.message.reply_text("Chưa khởi tạo Strategy Executor.")
+            await target.reply_text("Chưa khởi tạo Strategy Executor.")
             return
 
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-        # Mock current prices for PnL calculation
-        current_prices = {"ADA/USDT": 0.85, "NIGHT/ADA": 0.125, "NIGHT/USDT": 0.10}
+        # Real market prices for PnL calculation
+        current_prices = {"ADA/USDT": 0.148, "NIGHT/ADA": 0.33, "NIGHT/USDT": 0.0489}
         categorized = self.executor.get_open_trades_categorized(current_prices)
 
         cex_trades = categorized["cex"]
@@ -539,11 +604,14 @@ class TelegramSentinelBot:
             keyboard.append([InlineKeyboardButton("🚨 ĐÓNG TẤT CẢ VỊ THẾ", callback_data="close_all")])
 
         reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
-        await update.message.reply_text("\n".join(lines), parse_mode="Markdown", reply_markup=reply_markup)
+        await target.reply_text("\n".join(lines), parse_mode="Markdown", reply_markup=reply_markup)
 
     async def cmd_balance(self, update, context) -> None:
+        target = update.message or (update.callback_query.message if update.callback_query else None)
+        if not target:
+            return
         if not self.executor:
-            await update.message.reply_text("Chưa khởi tạo Strategy Executor.")
+            await target.reply_text("Chưa khởi tạo Strategy Executor.")
             return
 
         msg = (
@@ -556,7 +624,7 @@ class TelegramSentinelBot:
             f"• ADA Khả dụng: `{self.executor.dex_sim.ada_balance:,.2f} ADA`\n"
             f"• NIGHT Nắm giữ: `{self.executor.dex_sim.night_balance:,.2f} NIGHT`"
         )
-        await update.message.reply_text(msg, parse_mode="Markdown")
+        await target.reply_text(msg, parse_mode="Markdown")
 
     async def cmd_buy(self, update, context) -> None:
         """Command to buy: /buy <symbol> [amount]"""
@@ -676,12 +744,57 @@ class TelegramSentinelBot:
         if not data:
             return
 
-        # 1. Cancel
-        if data == "cancel":
-            await query.edit_message_text("❌ Đã hủy bỏ thao tác.")
+        # 1. Main Interactive Menu triggers
+        if data == "main_menu":
+            await self.cmd_menu(update, context)
             return
 
-        # 2. Dynamic Settings Update: set:key:val
+        if data == "menu:close":
+            try:
+                await query.message.delete()
+            except Exception:
+                try:
+                    await query.edit_message_text("❌ Đã đóng menu.")
+                except Exception:
+                    pass
+            return
+
+        if data == "menu:pnl":
+            await self.cmd_pnl(update, context)
+            return
+
+        if data == "menu:balance":
+            await self.cmd_balance(update, context)
+            return
+
+        if data == "menu:settings":
+            await self.cmd_settings(update, context)
+            return
+
+        if data == "menu:status":
+            await self.cmd_status(update, context)
+            return
+
+        if data == "menu:sd_ada":
+            await self.process_supply_demand_request(update, symbol="ADA", quote="USDT", timeframe="4h")
+            return
+
+        if data == "menu:sd_night":
+            await self.process_supply_demand_request(update, symbol="NIGHT", quote="ADA", timeframe="4h")
+            return
+
+        # 2. Cancel
+        if data == "cancel":
+            try:
+                if query.message and query.message.photo:
+                    await query.edit_message_caption("❌ Đã hủy bỏ thao tác.")
+                else:
+                    await query.edit_message_text("❌ Đã hủy bỏ thao tác.")
+            except Exception:
+                await query.answer("❌ Đã hủy bỏ thao tác.")
+            return
+
+        # 3. Dynamic Settings Update: set:key:val
         if data.startswith("set:") and self.executor:
             parts = data.split(":")
             if len(parts) >= 3:

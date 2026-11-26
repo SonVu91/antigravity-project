@@ -1,3 +1,4 @@
+import os
 import logging
 import asyncio
 import re
@@ -109,20 +110,39 @@ class TelegramSentinelBot:
 
             if image_path:
                 with open(image_path, "rb") as photo:
-                    await self.app.bot.send_photo(
+                    try:
+                        await self.app.bot.send_photo(
+                            chat_id=self.chat_id,
+                            photo=photo,
+                            caption=caption,
+                            parse_mode="Markdown",
+                            reply_markup=reply_markup,
+                        )
+                    except Exception as pe:
+                        logger.warning(f"Telegram alert photo Markdown parse failed: {pe}, fallback to plain text")
+                        photo.seek(0)
+                        plain_caption = caption.replace("*", "").replace("`", "").replace("_", "")
+                        await self.app.bot.send_photo(
+                            chat_id=self.chat_id,
+                            photo=photo,
+                            caption=plain_caption,
+                            reply_markup=reply_markup,
+                        )
+            else:
+                try:
+                    await self.app.bot.send_message(
                         chat_id=self.chat_id,
-                        photo=photo,
-                        caption=caption,
+                        text=caption,
                         parse_mode="Markdown",
                         reply_markup=reply_markup,
                     )
-            else:
-                await self.app.bot.send_message(
-                    chat_id=self.chat_id,
-                    text=caption,
-                    parse_mode="Markdown",
-                    reply_markup=reply_markup,
-                )
+                except Exception as me:
+                    plain_caption = caption.replace("*", "").replace("`", "").replace("_", "")
+                    await self.app.bot.send_message(
+                        chat_id=self.chat_id,
+                        text=plain_caption,
+                        reply_markup=reply_markup,
+                    )
         except Exception as e:
             logger.warning(f"Lỗi gửi cảnh báo qua Telegram: {e}")
 
@@ -354,15 +374,32 @@ class TelegramSentinelBot:
             # 6. Send photo
             if chart_path and os.path.exists(chart_path):
                 with open(chart_path, "rb") as photo:
-                    await update.message.reply_photo(
-                        photo=photo,
-                        caption=caption,
-                        parse_mode="Markdown",
-                        reply_markup=reply_markup,
-                    )
-                await wait_msg.delete()
+                    try:
+                        await update.message.reply_photo(
+                            photo=photo,
+                            caption=caption,
+                            parse_mode="Markdown",
+                            reply_markup=reply_markup,
+                        )
+                    except Exception as pe:
+                        logger.warning(f"Telegram Markdown parse failed: {pe}, fallback to plain text caption")
+                        photo.seek(0)
+                        plain_caption = caption.replace("*", "").replace("`", "").replace("_", "")
+                        await update.message.reply_photo(
+                            photo=photo,
+                            caption=plain_caption,
+                            reply_markup=reply_markup,
+                        )
+                try:
+                    await wait_msg.delete()
+                except Exception:
+                    pass
             else:
-                await wait_msg.edit_text(caption, parse_mode="Markdown", reply_markup=reply_markup)
+                try:
+                    await wait_msg.edit_text(caption, parse_mode="Markdown", reply_markup=reply_markup)
+                except Exception:
+                    plain_caption = caption.replace("*", "").replace("`", "").replace("_", "")
+                    await wait_msg.edit_text(plain_caption, reply_markup=reply_markup)
 
         except Exception as e:
             logger.error(f"Lỗi khi xử lý tra cứu S&D cho {pair}: {e}", exc_info=True)

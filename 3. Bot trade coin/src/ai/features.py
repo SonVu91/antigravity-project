@@ -1,5 +1,6 @@
 import logging
-from typing import List, Dict, Any, Optional
+from datetime import datetime, timezone
+from typing import List, Dict, Any, Optional, Tuple
 import pandas as pd
 import numpy as np
 
@@ -233,3 +234,70 @@ class FeatureExtractor:
             "arbitrage_spread_pct": spread_pct,
             "lead_signal": lead_signal,
         }
+
+    @staticmethod
+    def build_night_ada_ratio_candles(
+        cex_night_df: pd.DataFrame,
+        cex_ada_df: pd.DataFrame,
+        dex_night_ada_price: float = 0.0,
+    ) -> Tuple[pd.DataFrame, List[Dict[str, Any]]]:
+        """
+        Synthesizes normalized OHLCV candles for NIGHT/ADA in native ADA denomination
+        by dividing NIGHT/USD by ADA/USD from CEX and scaling to the live Cardano DEX pool ratio.
+        This provides proper indicators (RSI, S&D, ATR, SL/TP) in ADA ratio units (~0.33 ADA)
+        instead of mismatched USD units (~$0.049 USD).
+        """
+        if cex_night_df is None or cex_night_df.empty or cex_ada_df is None or cex_ada_df.empty:
+            return pd.DataFrame(), []
+
+        min_len = min(len(cex_night_df), len(cex_ada_df))
+        if min_len < 5:
+            return pd.DataFrame(), []
+
+        n_df = cex_night_df.iloc[-min_len:].reset_index(drop=True)
+        a_df = cex_ada_df.iloc[-min_len:].reset_index(drop=True)
+
+        ratio_close = n_df["close"] / (a_df["close"] + 1e-9)
+        ratio_open = n_df["open"] / (a_df["open"] + 1e-9)
+        ratio_high = n_df["high"] / (a_df["low"] + 1e-9)
+        ratio_low = n_df["low"] / (a_df["high"] + 1e-9)
+
+        # Scale series to live DEX price if available and within realistic bounds
+        scale = 1.0
+        if dex_night_ada_price > 0 and len(ratio_close) > 0:
+            last_c = float(ratio_close.iloc[-1])
+            if last_c > 0 and (abs(dex_night_ada_price - last_c) / last_c < 0.50):
+                scale = dex_night_ada_price / last_c
+
+        ratio_open_scaled = (ratio_open * scale).round(6)
+        ratio_high_scaled = (ratio_high * scale).round(6)
+        ratio_low_scaled = (ratio_low * scale).round(6)
+        ratio_close_scaled = (ratio_close * scale).round(6)
+
+        # Ensure high is max and low is min for realistic candle geometry
+        actual_high = np.maximum.reduce([ratio_open_scaled, ratio_high_scaled, ratio_close_scaled])
+        actual_low = np.minimum.reduce([ratio_open_scaled, ratio_low_scaled, ratio_close_scaled])
+
+        timestamps = (
+            n_df["timestamp"].tolist()
+            if "timestamp" in n_df.columns
+            else [datetime.now(timezone.utc) for _ in range(min_len)]
+        )
+        volumes = (
+            n_df["volume"].tolist()
+            if "volume" in n_df.columns
+            else [1000.0] * min_len
+        )
+
+        df_ratio = pd.DataFrame({
+            "timestamp": timestamps,
+            "open": ratio_open_scaled,
+            "high": actual_high,
+            "low": actual_low,
+            "close": ratio_close_scaled,
+            "volume": volumes,
+        })
+
+        candles_list = df_ratio.to_dict(orient="records")
+        return df_ratio, candles_list
+

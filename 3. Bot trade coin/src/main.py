@@ -221,23 +221,31 @@ class SentinelApplication:
                 )
                 await self._handle_signal_execution(ada_signal, ada_candles, market_data={}, current_prices=current_prices)
 
-        # 7. Sinh tín hiệu AI cho NIGHT/ADA (🥞 Cardano DEX) với tính năng Lead-Lag
+        # 7. Sinh tín hiệu AI cho NIGHT/ADA (🥞 Cardano DEX) với tỷ giá nến chuẩn hóa theo ADA và Lead-Lag
         lead_lag_data = FeatureExtractor.calculate_lead_lag_features(
             cex_night_df=df_night,
             cex_ada_df=df_ada,
             dex_night_ada_price=dex_night_ada_ratio,
         )
-        if not df_night.empty and len(df_night) >= 14:
+        df_night_ada, night_ada_candles = FeatureExtractor.build_night_ada_ratio_candles(
+            cex_night_df=df_night,
+            cex_ada_df=df_ada,
+            dex_night_ada_price=dex_night_ada_ratio,
+        )
+        dex_eval_df = df_night_ada if (not df_night_ada.empty and len(df_night_ada) >= 14) else df_night
+        dex_eval_candles = night_ada_candles if night_ada_candles else night_candles
+
+        if not dex_eval_df.empty and len(dex_eval_df) >= 14:
             if is_trading_time:
                 night_dex_signal = self.price_predictor.generate_signal(
                     asset=settings.DEX_NIGHT_PAIR,
                     market_type="DEX",
-                    df=df_night,
+                    df=dex_eval_df,
                     sentiment_score=sentiment_score,
                     lead_lag_data=lead_lag_data,
                     whale_inflow=sum(w["amount"] for w in whale_txs if w["asset"] == "NIGHT"),
                 )
-                await self._handle_signal_execution(night_dex_signal, night_candles, market_data={"pool_reserves": dex_night_res}, current_prices=current_prices)
+                await self._handle_signal_execution(night_dex_signal, dex_eval_candles, market_data={"pool_reserves": dex_night_res}, current_prices=current_prices)
 
         # 8. Quét các đồng coin bổ sung trong danh sách theo dõi (Watched Coins)
         for coin_pair in rm.watched_coins:

@@ -81,6 +81,20 @@ class PaperDEXSimulator:
 
         trade_id = f"dex_{uuid.uuid4().hex[:10]}"
 
+        # Dual-layer safety guardrail for SL/TP:
+        # Prevents inverted, missing, or cross-denomination SL/TP from triggering instant liquidation/TP
+        if side == "BUY":
+            rr_mult = getattr(settings, "TAKE_PROFIT_RR_RATIO", 2.0)
+            if take_profit <= effective_price * 1.005 or take_profit >= effective_price * 5.0:
+                take_profit = effective_price * (1.0 + (rr_mult * 0.03))
+            if stop_loss >= effective_price * 0.995 or stop_loss <= effective_price * 0.3 or stop_loss <= 0:
+                stop_loss = effective_price * 0.96
+        elif side == "SELL":
+            if stop_loss <= effective_price * 1.005 or stop_loss >= effective_price * 3.0 or stop_loss <= 0:
+                stop_loss = effective_price * 1.04
+            if take_profit >= effective_price * 0.995 or take_profit <= 0:
+                take_profit = effective_price * 0.92
+
         if side == "BUY":  # Spend ADA, get NIGHT
             if self.ada_balance < amount_in:
                 self.ada_balance += total_fee_ada  # Refund fee on failure

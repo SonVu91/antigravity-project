@@ -557,6 +557,52 @@ class TestCardanoMidnightSentinel(unittest.IsolatedAsyncioTestCase):
         executor.risk_manager.update_setting("tf", "1h")
         executor.risk_manager.update_setting("coins", "ADA/USDT,NIGHT/USDT,BTC/USDT,NIGHT/ADA")
 
+    async def test_14_night_ada_ratio_candles_and_guardrail(self):
+        """
+        Verify NIGHT/ADA ratio candle synthesis and DEX simulator SL/TP safety guardrail.
+        Prevents instant trade liquidation caused by currency mismatch.
+        """
+        # 1. Test build_night_ada_ratio_candles
+        n_data = [{"close": 0.049, "open": 0.048, "high": 0.050, "low": 0.047, "volume": 1000.0} for _ in range(20)]
+        a_data = [{"close": 0.150, "open": 0.149, "high": 0.152, "low": 0.148, "volume": 5000.0} for _ in range(20)]
+        df_n = pd.DataFrame(n_data)
+        df_a = pd.DataFrame(a_data)
+
+        df_ratio, ratio_candles = FeatureExtractor.build_night_ada_ratio_candles(df_n, df_a, dex_night_ada_price=0.3339)
+        self.assertFalse(df_ratio.empty)
+        self.assertEqual(len(ratio_candles), 20)
+        self.assertAlmostEqual(df_ratio["close"].iloc[-1], 0.3339, places=3)
+        self.assertGreaterEqual(df_ratio["high"].iloc[-1], df_ratio["close"].iloc[-1])
+        self.assertLessEqual(df_ratio["low"].iloc[-1], df_ratio["close"].iloc[-1])
+
+        # 2. Test PaperDEXSimulator guardrail against corrupted USD TP/SL
+        dex_sim = PaperDEXSimulator()
+        dex_sim.ada_balance = 5000.0
+
+        # Simulate swap with corrupted SL/TP (e.g. $0.0493 and $0.0515 passed for a 0.3339 trade)
+        res = await dex_sim.execute_swap(
+            pair="NIGHT/ADA",
+            side="BUY",
+            amount_in=1000.0,
+            pool_reserves={"reserve_quote": 1_000_000.0, "reserve_base": 3_000_000.0},
+            stop_loss=0.0493,   # Corrupted USD value
+            take_profit=0.0515, # Corrupted USD value
+            simulate_delay=False,
+        )
+        self.assertTrue(res["success"])
+        trade = res["trade"]
+
+        # Guardrail must have auto-corrected SL and TP to valid bounds relative to 0.3339
+        self.assertGreater(trade["take_profit"], trade["entry_price"])
+        self.assertLess(trade["stop_loss"], trade["entry_price"])
+        self.assertGreater(trade["take_profit"], 0.34)
+        self.assertLess(trade["stop_loss"], 0.33)
+
+        # 3. Verify check_open_positions does NOT immediately close at market price 0.3328
+        closed = dex_sim.check_open_positions({"NIGHT/ADA": 0.3328})
+        self.assertEqual(len(closed), 0, "Trade must stay open safely without instant close!")
+
+
 
 if __name__ == "__main__":
     unittest.main()

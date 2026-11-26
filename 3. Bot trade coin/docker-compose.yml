@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  cardano-sentinel:
+    build: .
+    container_name: cardano_midnight_sentinel
+    restart: unless-stopped
+    env_file:
+      - config/.env
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+    environment:
+      - PYTHONUNBUFFERED=1
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"

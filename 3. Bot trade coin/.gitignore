@@ -1,0 +1,32 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+
+# Local Database & Models
+data/
+*.db
+*.sqlite
+*.sqlite3
+models/*.pkl
+models/*.joblib
+
+# Environment Variables & Secrets
+.env
+config/.env
+*.env.local
+*.skey
+*.vkey
+root.xprv
+wallets/
+
+# Logs & temp
+*.log
+.coverage
+htmlcov/

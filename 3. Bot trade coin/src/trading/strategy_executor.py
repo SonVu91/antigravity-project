@@ -76,6 +76,12 @@ class StrategyExecutor:
         if action not in ["BUY", "SELL"]:
             return {"status": "SKIPPED", "reason": f"Signal action is {action}"}
 
+        if self.risk_manager.bot_mode == "MONITOR":
+            return {"status": "SKIPPED", "reason": "Bot đang ở chế độ CHỈ THEO DÕI (MONITOR), không tự động vào lệnh."}
+
+        if not self.risk_manager.is_within_trading_hours():
+            return {"status": "BLOCKED", "reason": f"Ngoài khung giờ giao dịch ({self.risk_manager.trading_hours})"}
+
         # 2. Risk check & Execution
         if market_type == "CEX":
             current_prices = {asset: entry_price}

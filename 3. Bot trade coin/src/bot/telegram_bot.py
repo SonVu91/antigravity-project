@@ -478,16 +478,33 @@ class TelegramSentinelBot:
         s = self.executor.risk_manager.get_all_settings()
         mode_icon = "🟢" if s["bot_mode"] == "paper_trading" else "🟡"
         mode_text = "PAPER TRADING" if s["bot_mode"] == "paper_trading" else "ALERT ONLY"
+        hours_status = "🟢 Đang mở giao dịch" if s.get("is_trading_active_now", True) else "🌙 Đang ngủ (Chỉ quản trị SL/TP)"
+        coins_display = ", ".join(s.get("watched_coins", []))
 
         msg = (
-            "⚙️ *CẤU HÌNH HỆ THỐNG VÀ THÔNG SỐ LỆNH*\n\n"
-            f"• Chế độ: {mode_icon} `{mode_text}`\n"
+            "⚙️ *BẢNG CẤU HÌNH HỆ THỐNG & THAM SỐ GIAO DỊCH*\n\n"
+            "⏱️ *KHUNG THỜI GIAN & THỊ TRƯỜNG:*\n"
+            f"• Khung nến quét (Timeframe): `{s.get('timeframe', '1h').upper()}`\n"
+            f"• Khung giờ hoạt động: `{s.get('trading_hours', '24/7')}` (UTC+7) ➔ _{hours_status}_\n"
+            f"• Danh sách Coin theo dõi: `{coins_display}`\n\n"
+            "🛡️ *QUẢN LÝ VỐN & THÔNG SỐ LỆNH:*\n"
+            f"• Chế độ vận hành: {mode_icon} `{mode_text}`\n"
             f"• Tỷ lệ Rủi ro / Vị thế: `{s['max_risk_pct']}% NAV`\n"
             f"• Cắt lỗ (SL): `{s['atr_sl_multiplier']}x ATR`\n"
             f"• Chốt lời (TP): `1:{s['tp_rr_ratio']} R:R`\n"
             f"• Ngưỡng Circuit Breaker: `{s['circuit_breaker_limit_pct']}% Drawdown`\n"
             f"• Ngưỡng Cảnh báo Arbitrage: `{s['arbitrage_threshold_pct']}% Spread`\n\n"
-            "Chạm vào các nút bên dưới để đổi nhanh thông số:"
+            "💡 *CÚ PHÁP GÕ TRỰC TIẾP ĐỂ THAY ĐỔI:*\n"
+            "• `/set tf <khung>` : Đổi khung nến (ví dụ: `/set tf 4h`, `15m`, `1h`, `1d`)\n"
+            "• `/set hours <giờ>` : Đổi giờ chạy (ví dụ: `/set hours 08:00-23:00` hoặc `/set hours 24/7`)\n"
+            "• `/set coins <danh_sách>` : Đặt lại coin (ví dụ: `/set coins BTC,ETH,ADA,SOL`)\n"
+            "• `/set add_coin <mã>` : Thêm coin (ví dụ: `/set add_coin SOL`)\n"
+            "• `/set remove_coin <mã>` : Xóa coin (ví dụ: `/set remove_coin NIGHT`)\n"
+            "• `/set sl <hệ_số>` : Đổi Cắt lỗ (ví dụ: `/set sl 2.0`)\n"
+            "• `/set tp <tỷ_lệ>` : Đổi Chốt lời (ví dụ: `/set tp 2.5`)\n"
+            "• `/set risk <phần_trăm>` : Đổi Rủi ro (ví dụ: `/set risk 2.0`)\n"
+            "• `/set mode <paper|alert>` : Đổi Chế độ bot\n\n"
+            "Hoặc chạm các nút cài nhanh bên dưới:"
         )
 
         next_mode = "alert_only" if s["bot_mode"] == "paper_trading" else "paper_trading"
@@ -495,6 +512,16 @@ class TelegramSentinelBot:
 
         keyboard = [
             [InlineKeyboardButton(next_mode_label, callback_data=f"set:mode:{next_mode}")],
+            [
+                InlineKeyboardButton("⏱️ TF 15m", callback_data="set:tf:15m"),
+                InlineKeyboardButton("⏱️ TF 1h", callback_data="set:tf:1h"),
+                InlineKeyboardButton("⏱️ TF 4h", callback_data="set:tf:4h"),
+                InlineKeyboardButton("⏱️ TF 1d", callback_data="set:tf:1d"),
+            ],
+            [
+                InlineKeyboardButton("⏰ Giờ: 24/7", callback_data="set:hours:24/7"),
+                InlineKeyboardButton("⏰ Giờ: 08:00-23:00", callback_data="set:hours:08:00-23:00"),
+            ],
             [
                 InlineKeyboardButton("Rủi ro 1.0%", callback_data="set:risk:1.0"),
                 InlineKeyboardButton("Rủi ro 1.5%", callback_data="set:risk:1.5"),
@@ -525,18 +552,27 @@ class TelegramSentinelBot:
         args = context.args
         if len(args) < 2:
             await update.message.reply_text(
-                "ℹ️ Cú pháp: `/set <tên_thông_số> <giá_trị>`\n"
-                "Ví dụ:\n"
-                "• `/set risk 2.0` (Đổi rủi ro thành 2.0% NAV)\n"
-                "• `/set sl 1.8` (Đổi Stop-Loss thành 1.8x ATR)\n"
-                "• `/set tp 2.5` (Đổi Chốt lời thành R:R 1:2.5)\n"
-                "• `/set mode alert_only` (Chuyển sang chế độ chỉ cảnh báo)\n"
-                "• `/set mode paper_trading` (Kích hoạt lại paper trading)",
+                "ℹ️ *HƯỚNG DẪN CÚ PHÁP GÕ TRỰC TIẾP LỆNH /set:*\n"
+                "`/set <tên_thông_số> <giá_trị>`\n\n"
+                "Ví dụ mẫu thực tế:\n"
+                "• `/set tf 4h` : Đổi khung nến quét sang 4h (15m, 1h, 4h, 1d)\n"
+                "• `/set hours 08:00-23:00` : Cài khung giờ giao dịch (UTC+7)\n"
+                "• `/set hours 24/7` : Chạy giao dịch 24/7 không nghỉ\n"
+                "• `/set coins BTC,ETH,ADA,SOL` : Đặt lại danh sách coin theo dõi\n"
+                "• `/set add_coin SOL` : Thêm coin vào danh sách theo dõi\n"
+                "• `/set remove_coin BTC` : Xóa coin khỏi danh sách theo dõi\n"
+                "• `/set sl 2.0` : Đổi Cắt lỗ thành 2.0x ATR\n"
+                "• `/set tp 2.5` : Đổi Chốt lời thành R:R 1:2.5\n"
+                "• `/set risk 2.0` : Đổi Tỷ lệ rủi ro thành 2.0% NAV\n"
+                "• `/set breaker 6.0` : Đổi ngưỡng ngắt mạch thành 6.0% drawdown\n"
+                "• `/set mode alert_only` : Chuyển chế độ chỉ gửi cảnh báo\n"
+                "• `/set mode paper_trading` : Kích hoạt chế độ paper trading",
                 parse_mode="Markdown",
             )
             return
 
-        key, val = args[0], args[1]
+        key = args[0]
+        val = " ".join(args[1:]).strip()
         ok, msg = self.executor.risk_manager.update_setting(key, val)
         prefix = "✅" if ok else "❌"
         await update.message.reply_text(f"{prefix} {msg}")
@@ -798,9 +834,11 @@ class TelegramSentinelBot:
         if data.startswith("set:") and self.executor:
             parts = data.split(":")
             if len(parts) >= 3:
-                key, val = parts[1], parts[2]
+                key = parts[1]
+                val = ":".join(parts[2:])
                 ok, msg = self.executor.risk_manager.update_setting(key, val)
-                await query.edit_message_text(f"⚙️ {msg}\n\n_Gõ /settings để xem lại toàn bộ cấu hình._", parse_mode="Markdown")
+                prefix = "✅" if ok else "❌"
+                await query.edit_message_text(f"{prefix} {msg}\n\n_Gõ /settings để xem lại toàn bộ cấu hình mới._", parse_mode="Markdown")
             return
 
         # 3. Supply & Demand Chart Refresh: sd_refresh:<pair>:<timeframe>

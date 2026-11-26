@@ -82,9 +82,15 @@ class SentinelApplication:
         """Execute a full market monitoring, AI inference, and execution cycle"""
         logger.info("--- BẮT ĐẦU CHU KỲ QUÉT THỊ TRƯỜNG ---")
 
-        # 1. Thu thập dữ liệu nến CEX
-        ada_candles = await self.cex_collector.fetch_ohlcv(settings.CEX_ADA_PAIR, timeframe="1h", limit=50)
-        night_candles = await self.cex_collector.fetch_ohlcv(settings.CEX_NIGHT_PAIR, timeframe="1h", limit=50)
+        # 1. Thu thập dữ liệu nến CEX theo khung nến cấu hình
+        rm = self.executor.risk_manager
+        tf = rm.timeframe
+        is_trading_time = rm.is_within_trading_hours()
+        if not is_trading_time:
+            logger.info(f"⏳ Ngoài khung giờ giao dịch ({rm.trading_hours}). Chế độ Standby: Chỉ theo dõi bảo vệ TP/SL, không mở lệnh mới.")
+
+        ada_candles = await self.cex_collector.fetch_ohlcv(settings.CEX_ADA_PAIR, timeframe=tf, limit=50)
+        night_candles = await self.cex_collector.fetch_ohlcv(settings.CEX_NIGHT_PAIR, timeframe=tf, limit=50)
 
         # 2. Thu thập dữ liệu Cardano On-chain & DEX
         latest_block = await self.cardano_collector.get_latest_block()
@@ -196,40 +202,64 @@ class SentinelApplication:
                 ratio_buttons = [[action_button, InlineKeyboardButton("❌ BỎ QUA", callback_data="cancel")]]
                 await self.telegram_bot.send_alert("TỐI ƯU TỶ GIÁ CẶP NIGHT / ADA", ratio_msg, buttons=ratio_buttons)
 
-        # 5. Sinh tín hiệu AI cho ADA/USDT (🏦 CEX)
-        if not df_ada.empty and len(df_ada) >= 14:
-            ada_signal = self.price_predictor.generate_signal(
-                asset=settings.CEX_ADA_PAIR,
-                market_type="CEX",
-                df=df_ada,
-                sentiment_score=sentiment_score,
-                whale_inflow=sum(w["amount"] for w in whale_txs if w["asset"] == "ADA"),
-            )
-            await self._handle_signal_execution(ada_signal, ada_candles, market_data={})
+        # 5. Khởi tạo bảng giá thị trường phục vụ tính toán và giám sát TP/SL
+        current_prices = {
+            settings.CEX_ADA_PAIR: cex_ada_usd,
+            settings.CEX_NIGHT_PAIR: cex_night_usd,
+            settings.DEX_NIGHT_PAIR: dex_night_ada_ratio,
+        }
 
-        # 6. Sinh tín hiệu AI cho NIGHT/ADA (🥞 Cardano DEX) với tính năng Lead-Lag
+        # 6. Sinh tín hiệu AI cho ADA/USDT (🏦 CEX)
+        if not df_ada.empty and len(df_ada) >= 14:
+            if is_trading_time:
+                ada_signal = self.price_predictor.generate_signal(
+                    asset=settings.CEX_ADA_PAIR,
+                    market_type="CEX",
+                    df=df_ada,
+                    sentiment_score=sentiment_score,
+                    whale_inflow=sum(w["amount"] for w in whale_txs if w["asset"] == "ADA"),
+                )
+                await self._handle_signal_execution(ada_signal, ada_candles, market_data={})
+
+        # 7. Sinh tín hiệu AI cho NIGHT/ADA (🥞 Cardano DEX) với tính năng Lead-Lag
         lead_lag_data = FeatureExtractor.calculate_lead_lag_features(
             cex_night_df=df_night,
             cex_ada_df=df_ada,
             dex_night_ada_price=dex_night_ada_ratio,
         )
         if not df_night.empty and len(df_night) >= 14:
-            night_dex_signal = self.price_predictor.generate_signal(
-                asset=settings.DEX_NIGHT_PAIR,
-                market_type="DEX",
-                df=df_night,
-                sentiment_score=sentiment_score,
-                lead_lag_data=lead_lag_data,
-                whale_inflow=sum(w["amount"] for w in whale_txs if w["asset"] == "NIGHT"),
-            )
-            await self._handle_signal_execution(night_dex_signal, night_candles, market_data={"pool_reserves": dex_night_res})
+            if is_trading_time:
+                night_dex_signal = self.price_predictor.generate_signal(
+                    asset=settings.DEX_NIGHT_PAIR,
+                    market_type="DEX",
+                    df=df_night,
+                    sentiment_score=sentiment_score,
+                    lead_lag_data=lead_lag_data,
+                    whale_inflow=sum(w["amount"] for w in whale_txs if w["asset"] == "NIGHT"),
+                )
+                await self._handle_signal_execution(night_dex_signal, night_candles, market_data={"pool_reserves": dex_night_res})
 
-        # 7. Kiểm tra đóng vị thế TP/SL các lệnh đang mở
-        current_prices = {
-            settings.CEX_ADA_PAIR: cex_ada_usd,
-            settings.CEX_NIGHT_PAIR: cex_night_usd,
-            settings.DEX_NIGHT_PAIR: dex_night_ada_ratio,
-        }
+        # 8. Quét các đồng coin bổ sung trong danh sách theo dõi (Watched Coins)
+        for coin_pair in rm.watched_coins:
+            if coin_pair in [settings.CEX_ADA_PAIR, settings.CEX_NIGHT_PAIR, settings.DEX_NIGHT_PAIR]:
+                continue
+            try:
+                coin_candles = await self.cex_collector.fetch_ohlcv(coin_pair, timeframe=tf, limit=50)
+                if coin_candles and len(coin_candles) >= 14:
+                    df_coin = pd.DataFrame(coin_candles)
+                    current_prices[coin_pair] = float(df_coin["close"].iloc[-1])
+                    if is_trading_time:
+                        coin_sig = self.price_predictor.generate_signal(
+                            asset=coin_pair,
+                            market_type="CEX",
+                            df=df_coin,
+                            sentiment_score=sentiment_score,
+                        )
+                        await self._handle_signal_execution(coin_sig, coin_candles, market_data={})
+            except Exception as e:
+                logger.debug(f"Bỏ qua quét phụ cho {coin_pair}: {e}")
+
+        # 9. Kiểm tra đóng vị thế TP/SL các lệnh đang mở (Luôn chạy 24/7 để bảo vệ tài sản)
         closed_cex = self.executor.cex_sim.check_open_positions(current_prices)
         closed_dex = self.executor.dex_sim.check_open_positions(current_prices)
 
@@ -265,13 +295,14 @@ class SentinelApplication:
         logger.info(f"Tín hiệu AI [{badge_short}]: {asset} => {action} (Độ tin cậy: {confidence*100:.0f}%)")
 
         if action in ["BUY", "SELL"] and confidence >= 0.60:
+            tf = self.executor.risk_manager.timeframe
             # Phân tích Vùng Cung - Cầu (Supply & Demand Confluence)
-            sd_signal = self.sd_detector.analyze(candles, symbol=asset, timeframe="1h")
+            sd_signal = self.sd_detector.analyze(candles, symbol=asset, timeframe=tf)
             if sd_signal.active_zones:
                 chart_file = generate_sd_chart(
                     candles=candles,
                     symbol=asset,
-                    timeframe="1h",
+                    timeframe=tf,
                     zones=sd_signal.active_zones,
                     signal=sd_signal,
                 )

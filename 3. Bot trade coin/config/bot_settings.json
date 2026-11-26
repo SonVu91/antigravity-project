@@ -1,0 +1,17 @@
+{
+  "bot_mode": "paper_trading",
+  "max_risk_pct": 2.0,
+  "atr_sl_multiplier": 1.8,
+  "tp_rr_ratio": 3.0,
+  "circuit_breaker_limit_pct": 5.0,
+  "arbitrage_threshold_pct": 3.0,
+  "timeframe": "1h",
+  "trading_hours": "24/7",
+  "watched_coins": [
+    "ADA/USDT",
+    "NIGHT/USDT",
+    "BTC/USDT",
+    "NIGHT/ADA"
+  ],
+  "updated_at": "2026-11-26T09:01:33.633602+00:00"
+}

@@ -261,6 +261,8 @@ class TestCardanoMidnightSentinel(unittest.IsolatedAsyncioTestCase):
     async def test_11_strategy_executor_end_to_end(self):
         """Test central StrategyExecutor processing signal and saving to DB"""
         executor = StrategyExecutor()
+        executor.risk_manager.bot_mode = "paper"
+        executor.risk_manager.trading_hours = "24/7"
         signal = {
             "signal_id": f"sig_test_{int(datetime.now().timestamp())}",
             "asset": "ADA/USDT",
@@ -331,6 +333,7 @@ class TestCardanoMidnightSentinel(unittest.IsolatedAsyncioTestCase):
         all_s = rm.get_all_settings()
         self.assertEqual(all_s["max_risk_pct"], 2.0)
         self.assertEqual(all_s["bot_mode"], "alert_only")
+        rm.update_setting("mode", "paper")
 
     async def test_15_manual_order_execution_and_categorized_pnl(self):
         """Test manual /buy on CEX and DEX, categorized PnL display, and manual close"""
@@ -459,6 +462,100 @@ class TestCardanoMidnightSentinel(unittest.IsolatedAsyncioTestCase):
         cb_query.message.reply_text.assert_called_once()
         cb_args, _ = cb_query.message.reply_text.call_args
         self.assertIn("BẢNG ĐIỀU KHIỂN TRUNG TÂM", cb_args[0])
+
+    async def test_20_timeframe_hours_watched_coins_configuration(self):
+        """Test dynamic configuration of timeframe, trading hours, and watched coins"""
+        from unittest.mock import AsyncMock, MagicMock
+        from src.trading.risk_manager import RiskManager
+        from src.bot.telegram_bot import TelegramSentinelBot
+        from src.trading.strategy_executor import StrategyExecutor
+
+        rm = RiskManager()
+
+        # 1. Test Timeframe setting
+        ok, msg = rm.update_setting("tf", "4h")
+        self.assertTrue(ok)
+        self.assertEqual(rm.timeframe, "4h")
+
+        ok, msg = rm.update_setting("timeframe", "15m")
+        self.assertTrue(ok)
+        self.assertEqual(rm.timeframe, "15m")
+
+        ok, msg = rm.update_setting("tf", "10m")  # Invalid timeframe
+        self.assertFalse(ok)
+        self.assertEqual(rm.timeframe, "15m")
+
+        # 2. Test Trading Hours setting & check logic
+        ok, msg = rm.update_setting("hours", "08:00-23:00")
+        self.assertTrue(ok)
+        self.assertEqual(rm.trading_hours, "08:00-23:00")
+
+        ok, msg = rm.update_setting("hours", "00:00-23:59")
+        self.assertTrue(ok)
+        self.assertTrue(rm.is_within_trading_hours())
+
+        ok, msg = rm.update_setting("hours", "24/7")
+        self.assertTrue(ok)
+        self.assertTrue(rm.is_within_trading_hours())
+
+        ok, msg = rm.update_setting("hours", "invalid-format")
+        self.assertFalse(ok)
+
+        # 3. Test Watched Coins (bulk replace, add, remove with auto-normalization)
+        ok, msg = rm.update_setting("coins", "BTC, ETH, ADA/USDT")
+        self.assertTrue(ok)
+        self.assertEqual(rm.watched_coins, ["BTC/USDT", "ETH/USDT", "ADA/USDT"])
+
+        ok, msg = rm.update_setting("add_coin", "SOL")
+        self.assertTrue(ok)
+        self.assertIn("SOL/USDT", rm.watched_coins)
+
+        ok, msg = rm.update_setting("remove_coin", "ETH")
+        self.assertTrue(ok)
+        self.assertNotIn("ETH/USDT", rm.watched_coins)
+
+        # 4. Test Persistence
+        rm.save_settings_to_file()
+        rm2 = RiskManager()
+        self.assertEqual(rm2.timeframe, "15m")
+        self.assertIn("SOL/USDT", rm2.watched_coins)
+
+        # 5. Test Telegram Bot /set command & /settings dashboard
+        executor = StrategyExecutor()
+        bot = TelegramSentinelBot(executor)
+
+        update = MagicMock()
+        update.message = AsyncMock()
+        context = MagicMock()
+
+        # /set tf 1h
+        context.args = ["tf", "1h"]
+        await bot.cmd_set(update, context)
+        self.assertEqual(executor.risk_manager.timeframe, "1h")
+
+        # /set hours 08:00-23:00
+        context.args = ["hours", "08:00-23:00"]
+        await bot.cmd_set(update, context)
+        self.assertEqual(executor.risk_manager.trading_hours, "08:00-23:00")
+
+        # /set add_coin DOGE
+        context.args = ["add_coin", "DOGE"]
+        await bot.cmd_set(update, context)
+        self.assertIn("DOGE/USDT", executor.risk_manager.watched_coins)
+
+        # /settings dashboard
+        await bot.cmd_settings(update, context)
+        update.message.reply_text.assert_called()
+        last_call_args = update.message.reply_text.call_args[0][0]
+        self.assertIn("BẢNG CẤU HÌNH HỆ THỐNG", last_call_args)
+        self.assertIn("DOGE/USDT", last_call_args)
+        self.assertIn("08:00-23:00", last_call_args)
+
+        # Restore defaults
+        executor.risk_manager.update_setting("mode", "paper")
+        executor.risk_manager.update_setting("hours", "24/7")
+        executor.risk_manager.update_setting("tf", "1h")
+        executor.risk_manager.update_setting("coins", "ADA/USDT,NIGHT/USDT,BTC/USDT,NIGHT/ADA")
 
 
 if __name__ == "__main__":

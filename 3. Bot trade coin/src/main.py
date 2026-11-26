@@ -119,8 +119,11 @@ class SentinelApplication:
         )
         spread = usd_parity["spread_pct"]
         threshold = self.executor.risk_manager.arbitrage_threshold_pct
+        is_dex_live = dex_night_res.get("is_live", True)
 
-        if abs(spread) >= threshold:
+        if not is_dex_live:
+            logger.warning("DEX Pool data đang ở chế độ dự phòng (fallback). Bỏ qua cảnh báo chênh lệch giá CEX vs DEX để tránh báo sai.")
+        elif abs(spread) >= threshold:
             should_alert = False
             if self.last_arbitrage_alert_time is None:
                 should_alert = True

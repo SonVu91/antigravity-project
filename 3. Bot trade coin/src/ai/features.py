@@ -130,7 +130,14 @@ class FeatureExtractor:
         # Historical ratio: (NIGHT/USD) / (ADA/USD) = NIGHT/ADA
         ratio_series = pd.Series(night_closes / (ada_closes + 1e-9))
 
-        cur_ratio = dex_night_ada_price if dex_night_ada_price > 0 else float(ratio_series.iloc[-1])
+        # Consistent current ratio calculation:
+        series_last_ratio = float(ratio_series.iloc[-1])
+        # Use DEX price if available and within realistic bounds (< 25% divergence from market ratio), otherwise use consistent series ratio
+        if dex_night_ada_price and dex_night_ada_price > 0 and (abs(dex_night_ada_price - series_last_ratio) / (series_last_ratio + 1e-9) < 0.25):
+            cur_ratio = dex_night_ada_price
+        else:
+            cur_ratio = series_last_ratio
+
         inv_ratio = 1.0 / (cur_ratio + 1e-9)
 
         # 20-period Mean and Std of the ratio

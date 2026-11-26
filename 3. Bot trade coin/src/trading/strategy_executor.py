@@ -28,6 +28,9 @@ class StrategyExecutor:
         self.dex_sim = PaperDEXSimulator()
         self.peak_nav_cex = settings.PAPER_INITIAL_USDT
         self.peak_nav_dex = settings.PAPER_INITIAL_ADA
+        from src.trading.portfolio_reporter import PortfolioReporter
+        self.reporter = PortfolioReporter(self)
+        self.last_closed_trade: Optional[Dict[str, Any]] = None
 
     async def process_signal(
         self,
@@ -137,6 +140,7 @@ class StrategyExecutor:
                     status=trade_info["status"],
                 )
                 session.add(trade_obj)
+            await self.reporter.sync_database()
             return {"status": "EXECUTED", "trade": trade_info}
 
         return {"status": "FAILED", "error": result.get("error")}
@@ -230,12 +234,15 @@ class StrategyExecutor:
                     status=trade_info["status"],
                 )
                 session.add(trade_obj)
+            await self.reporter.sync_database()
             return {"status": "EXECUTED", "trade": trade_info}
 
         return {"status": "FAILED", "error": res.get("error")}
 
     def close_single_trade(self, trade_id: str, current_price: Optional[float] = None) -> Tuple[bool, str]:
         """Close a specific open trade on CEX or DEX"""
+        import asyncio
+
         # Check CEX
         if trade_id in self.cex_sim.open_trades:
             trade = self.cex_sim.open_trades[trade_id]
@@ -253,10 +260,16 @@ class StrategyExecutor:
                 trade["exit_time"] = datetime.now(timezone.utc)
                 trade["status"] = "CLOSED"
                 trade["pnl"] = round(net_pnl, 2)
+                trade["pnl_pct"] = round((net_pnl / trade["cost_basis"]) * 100.0, 2) if trade.get("cost_basis", 0) > 0 else 0.0
                 trade["close_reason"] = "MANUAL_CLOSE"
+                self.last_closed_trade = trade
                 del self.cex_sim.open_trades[trade_id]
+                self._dispatch_db_sync(trade)
                 return True, f"Đã đóng vị thế CEX `{trade['asset']}` (Lời/Lỗ: ${net_pnl:+,.2f})."
-            return True, f"Đã đóng vị thế CEX `{trade['asset']}`."
+            else:
+                self.last_closed_trade = closed_list[0]
+                self._dispatch_db_sync(closed_list[0])
+                return True, f"Đã đóng vị thế CEX `{trade['asset']}` (Lời/Lỗ: ${closed_list[0].get('pnl', 0.0):+,.2f})."
 
         # Check DEX
         if trade_id in self.dex_sim.open_positions:
@@ -271,11 +284,24 @@ class StrategyExecutor:
             trade["exit_time"] = datetime.now(timezone.utc)
             trade["status"] = "CLOSED"
             trade["pnl"] = round(pnl_ada, 2)
+            trade["pnl_pct"] = round((pnl_ada / trade["cost_basis"]) * 100.0, 2) if trade.get("cost_basis", 0) > 0 else 0.0
             trade["close_reason"] = "MANUAL_CLOSE"
+            self.last_closed_trade = trade
             del self.dex_sim.open_positions[trade_id]
+            self._dispatch_db_sync(trade)
             return True, f"Đã đóng vị thế DEX `{trade['asset']}` (Lời/Lỗ: {pnl_ada:+,.2f} ADA)."
 
         return False, f"Không tìm thấy vị thế `{trade_id}`."
+
+    def _dispatch_db_sync(self, trade: Dict[str, Any]) -> None:
+        """Schedule database sync in background if an event loop is running"""
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self.reporter.record_closed_trade_in_db(trade))
+            loop.create_task(self.reporter.sync_database())
+        except RuntimeError:
+            pass
 
     def close_all_trades(self, current_prices: Dict[str, float]) -> List[str]:
         """Close all open positions on both CEX and DEX"""
@@ -325,3 +351,6 @@ class StrategyExecutor:
             })
 
         return {"cex": cex_list, "dex": dex_list}
+
+    # Alias for compatibility
+    get_open_trades_categorized = get_open_positions_categorized

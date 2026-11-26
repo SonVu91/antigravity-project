@@ -231,12 +231,20 @@ class SentinelApplication:
         closed_dex = self.executor.dex_sim.check_open_positions(current_prices)
 
         for trade in closed_cex + closed_dex:
+            await self.executor.reporter.record_closed_trade_in_db(trade)
+            await self.executor.reporter.sync_database(current_prices)
+            report_block = await self.executor.reporter.format_telegram_report(
+                trigger_type="CLOSE",
+                trade_info=trade,
+                current_prices=current_prices,
+            )
             market_badge = "🏦 CEX" if trade['market_type'] == "CEX" else "🥞 CARDANO DEX"
             pnl_msg = (
                 f"Đã đóng vị thế {trade['asset']} trên {market_badge}:\n"
                 f"• Lý do: `{trade.get('close_reason')}`\n"
                 f"• Lời/Lỗ: `{trade.get('pnl'):+,.2f}` ({trade.get('pnl_pct'):+.2f}%)\n"
-                f"• Giá thoát: `{trade.get('exit_price')}`"
+                f"• Giá thoát: `{trade.get('exit_price')}`\n\n"
+                f"{report_block}"
             )
             await self.telegram_bot.send_alert("CHỐT VỊ THẾ PAPER TRADING", pnl_msg)
 
@@ -321,13 +329,18 @@ class SentinelApplication:
                 trade = exec_result["trade"]
                 exec_badge = "🥞 CARDANO DEX" if trade['market_type'] == "DEX" else "🏦 CEX"
                 fee_unit = "ADA" if trade['market_type'] == "DEX" else "USDT"
+                report_block = await self.executor.reporter.format_telegram_report(
+                    trigger_type="EXECUTE",
+                    trade_info=trade,
+                )
                 exec_msg = (
                     f"✅ Khớp lệnh Giả lập thành công trên {exec_badge}:\n"
                     f"• Mã lệnh: `{trade['trade_id']}`\n"
                     f"• {trade['side']} `{trade['quantity']:,.2f} {asset.split('/')[0]}`\n"
                     f"• Giá khớp: `{trade['entry_price']}`\n"
                     f"• Phí đã trừ: `{trade['fee_paid']} {fee_unit}`\n"
-                    f"• Trượt giá: `{trade['slippage']}%`"
+                    f"• Trượt giá: `{trade['slippage']}%\n\n`"
+                    f"{report_block}"
                 )
                 await self.telegram_bot.send_alert("KHỚP LỆNH PAPER TRADING", exec_msg)
 

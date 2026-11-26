@@ -28,10 +28,17 @@ echo.
 echo.
 
 echo ==============================================================================
-echo [3/3] Chay bo kiem thu he thong tu dong (18 test cases)...
+echo [3/4] Chay bo kiem thu he thong tu dong (18 test cases)...
 echo ==============================================================================
 echo.
 .\venv\Scripts\python.exe -m unittest tests/test_system.py -v
+echo.
+
+echo ==============================================================================
+echo [4/4] Chay bo kiem thu Bao cao Tai san & PnL (4 test cases)...
+echo ==============================================================================
+echo.
+.\venv\Scripts\python.exe -m unittest tests/test_portfolio_reporting.py -v
 echo.
 
 pause

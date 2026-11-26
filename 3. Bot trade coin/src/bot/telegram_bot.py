@@ -603,15 +603,23 @@ class TelegramSentinelBot:
         if not args or args[0].lower() == "all":
             msgs = self.executor.close_all_trades({"ADA/USDT": 0.85, "NIGHT/ADA": 0.125, "NIGHT/USDT": 0.10})
             if msgs:
-                await update.message.reply_text("🛑 " + "\n".join(msgs))
+                report_block = await self.executor.reporter.format_telegram_report(trigger_type="CLOSE")
+                await update.message.reply_text("🛑 " + "\n".join(msgs) + f"\n\n{report_block}", parse_mode="Markdown")
             else:
                 await update.message.reply_text("Không có vị thế nào đang mở để đóng.")
             return
 
         trade_id = args[0].strip()
         ok, msg = self.executor.close_single_trade(trade_id)
-        prefix = "✅" if ok else "❌"
-        await update.message.reply_text(f"{prefix} {msg}")
+        if ok:
+            closed_trade = getattr(self.executor, "last_closed_trade", None)
+            report_block = await self.executor.reporter.format_telegram_report(
+                trigger_type="CLOSE",
+                trade_info=closed_trade,
+            )
+            await update.message.reply_text(f"✅ {msg}\n\n{report_block}", parse_mode="Markdown")
+        else:
+            await update.message.reply_text(f"❌ {msg}")
 
     async def cmd_stop_all(self, update, context) -> None:
         """Emergency circuit breaker trigger"""
@@ -704,15 +712,23 @@ class TelegramSentinelBot:
         if data.startswith("close:") and self.executor:
             trade_id = data.split(":", 1)[1]
             ok, msg = self.executor.close_single_trade(trade_id)
-            prefix = "✅" if ok else "❌"
-            await query.edit_message_text(f"{prefix} {msg}")
+            if ok:
+                closed_trade = getattr(self.executor, "last_closed_trade", None)
+                report_block = await self.executor.reporter.format_telegram_report(
+                    trigger_type="CLOSE",
+                    trade_info=closed_trade,
+                )
+                await query.edit_message_text(f"✅ {msg}\n\n{report_block}", parse_mode="Markdown")
+            else:
+                await query.edit_message_text(f"❌ {msg}")
             return
 
         # 5. Close All: close_all
         if data == "close_all" and self.executor:
             msgs = self.executor.close_all_trades({"ADA/USDT": 0.85, "NIGHT/ADA": 0.125, "NIGHT/USDT": 0.10})
             if msgs:
-                await query.edit_message_text("🛑 " + "\n".join(msgs))
+                report_block = await self.executor.reporter.format_telegram_report(trigger_type="CLOSE")
+                await query.edit_message_text("🛑 " + "\n".join(msgs) + f"\n\n{report_block}", parse_mode="Markdown")
             else:
                 await query.edit_message_text("Không có vị thế nào đang mở để đóng.")
             return
@@ -763,6 +779,10 @@ class TelegramSentinelBot:
                 t = res["trade"]
                 badge = "🥞 CARDANO DEX" if t["market_type"] == "DEX" else "🏦 CEX"
                 fee_unit = "ADA" if t["market_type"] == "DEX" else "USDT"
+                report_block = await self.executor.reporter.format_telegram_report(
+                    trigger_type="EXECUTE",
+                    trade_info=t,
+                )
                 fill_msg = (
                     f"✅ *KHỚP LỆNH THÀNH CÔNG TRÊN {badge}*\n\n"
                     f"• Mã lệnh: `{t['trade_id']}`\n"
@@ -770,8 +790,8 @@ class TelegramSentinelBot:
                     f"• Giá khớp: `{t['entry_price']}`\n"
                     f"• Stop-Loss: `{t['stop_loss']}` | Take-Profit: `{t['take_profit']}`\n"
                     f"• Phí đã trừ: `{t['fee_paid']} {fee_unit}`\n"
-                    f"• Trượt giá: `{t['slippage']}%`\n\n"
-                    "_Vị thế đã được ghi vào cơ sở dữ liệu. Gõ /pnl để theo dõi lời/lỗ._"
+                    f"• Trượt giá: `{t['slippage']}%\n\n`"
+                    f"{report_block}"
                 )
                 await query.edit_message_text(fill_msg, parse_mode="Markdown")
             else:

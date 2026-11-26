@@ -54,6 +54,8 @@ class TelegramSentinelBot:
             # Command Handlers
             self.app.add_handler(CommandHandler("start", self.cmd_start))
             self.app.add_handler(CommandHandler("menu", self.cmd_menu))
+            self.app.add_handler(CommandHandler("orders", self.cmd_orders))
+            self.app.add_handler(CommandHandler("positions", self.cmd_orders))
             self.app.add_handler(CommandHandler("status", self.cmd_status))
             self.app.add_handler(CommandHandler("pnl", self.cmd_pnl))
             self.app.add_handler(CommandHandler("balance", self.cmd_balance))
@@ -81,6 +83,7 @@ class TelegramSentinelBot:
                 from telegram import BotCommand
                 bot_commands = [
                     BotCommand("menu", "🎛️ Bảng điều khiển 1 chạm"),
+                    BotCommand("orders", "📋 Sổ lệnh chi tiết đang chạy"),
                     BotCommand("pnl", "📈 Hiệu suất & Vị thế mở"),
                     BotCommand("balance", "💰 Số dư CEX & Ví DEX"),
                     BotCommand("settings", "⚙️ Cài đặt rủi ro & Chế độ"),
@@ -179,19 +182,20 @@ class TelegramSentinelBot:
         )
         keyboard = [
             [
+                InlineKeyboardButton("📋 SỔ LỆNH ĐANG CHẠY", callback_data="menu:orders"),
                 InlineKeyboardButton("📊 BÁO CÁO PNL", callback_data="menu:pnl"),
-                InlineKeyboardButton("💰 SỐ DƯ TÀI KHOẢN", callback_data="menu:balance"),
             ],
             [
+                InlineKeyboardButton("💰 SỐ DƯ TÀI KHOẢN", callback_data="menu:balance"),
                 InlineKeyboardButton("⚙️ CÀI ĐẶT RỦI RO", callback_data="menu:settings"),
+            ],
+            [
                 InlineKeyboardButton("📈 TRẠNG THÁI BOT", callback_data="menu:status"),
+                InlineKeyboardButton("❌ ĐÓNG MENU", callback_data="menu:close"),
             ],
             [
                 InlineKeyboardButton("🏛️ S&D ADA/USDT", callback_data="menu:sd_ada"),
                 InlineKeyboardButton("🏛️ S&D NIGHT/ADA", callback_data="menu:sd_night"),
-            ],
-            [
-                InlineKeyboardButton("❌ ĐÓNG MENU", callback_data="menu:close"),
             ],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -210,6 +214,7 @@ class TelegramSentinelBot:
             "  _Ví dụ:_ `/sd btc/usdt 1d` hoặc `/sd ada 4h`\n\n"
             "⚙️ *LỆNH ĐIỀU KHIỂN & VẬN HÀNH:*\n"
             "• `/menu`: Bảng điều khiển tương tác 1 chạm (Interactive Menu)\n"
+            "• `/orders`: Sổ lệnh chi tiết các vị thế đang chạy (kèm nút đóng từng lệnh)\n"
             "• `/status`: Trạng thái hệ thống & kết nối CEX/DEX\n"
             "• `/pnl`: Báo cáo vị thế & PnL realtime kèm nút đóng lệnh\n"
             "• `/balance`: Số dư tài khoản CEX & Ví Cardano\n"
@@ -596,7 +601,52 @@ class TelegramSentinelBot:
 
         await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
-    async def cmd_pnl(self, update, context) -> None:
+    async def get_live_market_prices(self) -> Dict[str, float]:
+        """Fetch latest live prices for all open positions and tracked assets"""
+        prices = {}
+        symbols_to_fetch = set()
+        if self.executor:
+            symbols_to_fetch.update(self.executor.risk_manager.watched_coins)
+            for t in self.executor.cex_sim.open_trades.values():
+                symbols_to_fetch.add(t["asset"])
+            for t in self.executor.dex_sim.open_positions.values():
+                symbols_to_fetch.add(t["asset"])
+
+        # Fetch CEX tickers
+        for sym in symbols_to_fetch:
+            if "/" in sym and not sym.endswith("/ADA"):
+                try:
+                    ticker = await self.cex_collector.get_latest_ticker(sym)
+                    if ticker and ticker.get("last", 0.0) > 0:
+                        prices[sym] = ticker["last"]
+                except Exception as e:
+                    logger.debug(f"Không thể lấy ticker cho {sym}: {e}")
+
+        # Fetch DEX pool reserves
+        try:
+            if not hasattr(self, "dex_collector") or not self.dex_collector:
+                from src.collectors.dex_collector import DEXCollector
+                self.dex_collector = DEXCollector()
+            res = await self.dex_collector.fetch_pool_reserves(settings.DEX_NIGHT_PAIR)
+            if res and "price" in res:
+                prices[settings.DEX_NIGHT_PAIR] = float(res["price"])
+                prices["NIGHT/ADA"] = float(res["price"])
+        except Exception as e:
+            logger.debug(f"Không thể lấy giá DEX: {e}")
+
+        # Fallback to entry price for any open trade without live ticker
+        if self.executor:
+            for t in self.executor.cex_sim.open_trades.values():
+                if t["asset"] not in prices:
+                    prices[t["asset"]] = t.get("entry_price", 0.0)
+            for t in self.executor.dex_sim.open_positions.values():
+                if t["asset"] not in prices:
+                    prices[t["asset"]] = t.get("entry_price", 0.125)
+
+        return prices
+
+    async def cmd_orders(self, update, context) -> None:
+        """Command /orders or /positions: Display detailed live order book"""
         target = update.message or (update.callback_query.message if update.callback_query else None)
         if not target:
             return
@@ -604,43 +654,23 @@ class TelegramSentinelBot:
             await target.reply_text("Chưa khởi tạo Strategy Executor.")
             return
 
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        from telegram import InlineKeyboardMarkup
 
-        # Real market prices for PnL calculation
-        current_prices = {"ADA/USDT": 0.148, "NIGHT/ADA": 0.33, "NIGHT/USDT": 0.0489}
-        categorized = self.executor.get_open_trades_categorized(current_prices)
+        current_prices = await self.get_live_market_prices()
+        msg, keyboard = self.executor.format_detailed_orders_report(current_prices)
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
-        cex_trades = categorized["cex"]
-        dex_trades = categorized["dex"]
-
-        lines = ["📈 *BÁO CÁO HIỆU SUẤT VỊ THẾ PAPER TRADING*\n"]
-        keyboard = []
-
-        lines.append("🏦 *VỊ THẾ SÀN TẬP TRUNG (CEX - Tài khoản USDT):*")
-        if cex_trades:
-            for i, t in enumerate(cex_trades, 1):
-                pnl_str = f"{t['unrealized_pnl']:+,.2f} USDT ({t['unrealized_pnl_pct']:+.2f}%)"
-                lines.append(f"• #{i} `{t['asset']}` ({t['side']}): Giá vào `{t['entry_price']}` | PnL: `{pnl_str}`")
-                keyboard.append([InlineKeyboardButton(f"🛑 Đóng CEX #{i} ({t['asset']})", callback_data=f"close:{t['trade_id']}")])
+        if update.callback_query and update.callback_query.message:
+            try:
+                await update.callback_query.message.edit_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
+            except Exception:
+                await update.callback_query.message.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
         else:
-            lines.append("_(Chưa có vị thế CEX nào đang mở)_")
+            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
 
-        lines.append("\n🥞 *VỊ THẾ SÀN PHI TẬP TRUNG (CARDANO DEX - Ví Cardano):*")
-        if dex_trades:
-            for i, t in enumerate(dex_trades, 1):
-                pnl_str = f"{t['unrealized_pnl']:+,.2f} ADA ({t['unrealized_pnl_pct']:+.2f}%)"
-                lines.append(f"• #{i} `{t['asset']}` ({t['side']}): Giá vào `{t['entry_price']}` | PnL: `{pnl_str}`")
-                keyboard.append([InlineKeyboardButton(f"🛑 Đóng DEX #{i} ({t['asset']})", callback_data=f"close:{t['trade_id']}")])
-        else:
-            lines.append("_(Chưa có vị thế Cardano DEX nào đang mở)_")
-
-        lines.append(f"\n💰 *Số dư:* CEX `${self.executor.cex_sim.usdt_balance:,.2f}` | DEX `{self.executor.dex_sim.ada_balance:,.2f} ADA`")
-
-        if cex_trades or dex_trades:
-            keyboard.append([InlineKeyboardButton("🚨 ĐÓNG TẤT CẢ VỊ THẾ", callback_data="close_all")])
-
-        reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
-        await target.reply_text("\n".join(lines), parse_mode="Markdown", reply_markup=reply_markup)
+    async def cmd_pnl(self, update, context) -> None:
+        """Alias for comprehensive order book & PnL reporting"""
+        await self.cmd_orders(update, context)
 
     async def cmd_balance(self, update, context) -> None:
         target = update.message or (update.callback_query.message if update.callback_query else None)
@@ -703,23 +733,27 @@ class TelegramSentinelBot:
             await update.message.reply_text("Executor chưa khởi tạo.")
             return
 
+        current_prices = await self.get_live_market_prices()
         args = context.args
         if not args or args[0].lower() == "all":
-            msgs = self.executor.close_all_trades({"ADA/USDT": 0.85, "NIGHT/ADA": 0.125, "NIGHT/USDT": 0.10})
+            msgs = self.executor.close_all_trades(current_prices)
             if msgs:
-                report_block = await self.executor.reporter.format_telegram_report(trigger_type="CLOSE")
+                report_block = await self.executor.reporter.format_telegram_report(trigger_type="CLOSE", current_prices=current_prices)
                 await update.message.reply_text("🛑 " + "\n".join(msgs) + f"\n\n{report_block}", parse_mode="Markdown")
             else:
                 await update.message.reply_text("Không có vị thế nào đang mở để đóng.")
             return
 
         trade_id = args[0].strip()
-        ok, msg = self.executor.close_single_trade(trade_id)
+        t_obj = self.executor.cex_sim.open_trades.get(trade_id) or self.executor.dex_sim.open_positions.get(trade_id)
+        cur_p = current_prices.get(t_obj["asset"]) if t_obj else None
+        ok, msg = self.executor.close_single_trade(trade_id, cur_p)
         if ok:
             closed_trade = getattr(self.executor, "last_closed_trade", None)
             report_block = await self.executor.reporter.format_telegram_report(
                 trigger_type="CLOSE",
                 trade_info=closed_trade,
+                current_prices=current_prices,
             )
             await update.message.reply_text(f"✅ {msg}\n\n{report_block}", parse_mode="Markdown")
         else:
@@ -803,6 +837,10 @@ class TelegramSentinelBot:
             await self.cmd_balance(update, context)
             return
 
+        if data in ["menu:orders", "refresh_orders"]:
+            await self.cmd_orders(update, context)
+            return
+
         if data == "menu:settings":
             await self.cmd_settings(update, context)
             return
@@ -862,26 +900,31 @@ class TelegramSentinelBot:
         # 4. Close Single Trade: close:<trade_id>
         if data.startswith("close:") and self.executor:
             trade_id = data.split(":", 1)[1]
-            ok, msg = self.executor.close_single_trade(trade_id)
+            live_prices = await self.get_live_market_prices()
+            t_obj = self.executor.cex_sim.open_trades.get(trade_id) or self.executor.dex_sim.open_positions.get(trade_id)
+            cur_p = live_prices.get(t_obj["asset"]) if t_obj else None
+            ok, msg = self.executor.close_single_trade(trade_id, cur_p)
             if ok:
-                closed_trade = getattr(self.executor, "last_closed_trade", None)
-                report_block = await self.executor.reporter.format_telegram_report(
-                    trigger_type="CLOSE",
-                    trade_info=closed_trade,
-                )
-                await query.edit_message_text(f"✅ {msg}\n\n{report_block}", parse_mode="Markdown")
+                from telegram import InlineKeyboardMarkup
+                refreshed_prices = await self.get_live_market_prices()
+                orders_msg, keyboard = self.executor.format_detailed_orders_report(refreshed_prices)
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                notice = f"✅ {msg}\n\n"
+                await query.edit_message_text(notice + orders_msg, parse_mode="Markdown", reply_markup=reply_markup)
             else:
                 await query.edit_message_text(f"❌ {msg}")
             return
 
         # 5. Close All: close_all
         if data == "close_all" and self.executor:
-            msgs = self.executor.close_all_trades({"ADA/USDT": 0.85, "NIGHT/ADA": 0.125, "NIGHT/USDT": 0.10})
-            if msgs:
-                report_block = await self.executor.reporter.format_telegram_report(trigger_type="CLOSE")
-                await query.edit_message_text("🛑 " + "\n".join(msgs) + f"\n\n{report_block}", parse_mode="Markdown")
-            else:
-                await query.edit_message_text("Không có vị thế nào đang mở để đóng.")
+            from telegram import InlineKeyboardMarkup
+            live_prices = await self.get_live_market_prices()
+            msgs = self.executor.close_all_trades(live_prices)
+            refreshed_prices = await self.get_live_market_prices()
+            orders_msg, keyboard = self.executor.format_detailed_orders_report(refreshed_prices)
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            notice = "🛑 " + "\n".join(msgs) + "\n\n" if msgs else "Không có vị thế nào đang mở.\n\n"
+            await query.edit_message_text(notice + orders_msg, parse_mode="Markdown", reply_markup=reply_markup)
             return
 
         # 6. Order Prep: order_prep:<symbol>:<side>:<market>

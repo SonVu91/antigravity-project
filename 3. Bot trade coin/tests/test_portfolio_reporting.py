@@ -103,6 +103,63 @@ class TestPortfolioReporting(unittest.TestCase):
 
         self.loop.run_until_complete(check_db())
 
+    def test_05_btc_holdings_and_nav_accuracy(self):
+        """Test buying BTC, ensuring it appears under Giữ (Holdings) and NAV is fully valued"""
+        # Execute manual BTC buy
+        res = self.loop.run_until_complete(
+            self.executor.execute_manual_trade(
+                symbol="BTC/USDT",
+                side="BUY",
+                amount=0.02,
+                current_price=60000.0,
+            )
+        )
+        self.assertEqual(res["status"], "EXECUTED")
+        self.assertAlmostEqual(self.executor.cex_sim.holdings.get("BTC", 0.0), 0.02, places=4)
+
+        current_prices = {"BTC/USDT": 60000.0, "ADA/USDT": 0.85, "NIGHT/ADA": 0.125}
+        summary = self.loop.run_until_complete(self.reporter.get_portfolio_summary(current_prices))
+
+        # CEX NAV must reflect free cash + 0.02 * 60,000 (~1,200 USDT)
+        self.assertIn("0.02", summary["cex"]["holdings_str"])
+        self.assertIn("BTC", summary["cex"]["holdings_str"])
+        # Free USDT cash is ~8,799 USDT + 1,200 BTC value = ~9,999 USDT (minus fee)
+        self.assertGreater(summary["cex"]["nav_usdt"], 9990.0)
+
+        report = self.loop.run_until_complete(
+            self.reporter.format_telegram_report(trigger_type="EXECUTE", trade_info=res["trade"], current_prices=current_prices)
+        )
+        self.assertIn("0.02", report)
+        self.assertIn("BTC", report)
+        self.assertNotIn("0.0 ADA", report)  # Unheld assets are hidden
+
+    def test_06_detailed_orders_report(self):
+        """Test detailed orders book card formatting and action buttons"""
+        # Open BTC position
+        self.loop.run_until_complete(
+            self.executor.execute_manual_trade(
+                symbol="BTC/USDT",
+                side="BUY",
+                amount=0.02,
+                current_price=60000.0,
+            )
+        )
+        # Price increases to 61,000 -> Unrealized profit with slippage = (61,000 - 60,030) * 0.02 = +$19.40
+        current_prices = {"BTC/USDT": 61000.0, "ADA/USDT": 0.85}
+        msg, keyboard = self.executor.format_detailed_orders_report(current_prices)
+
+        self.assertIn("SỔ LỆNH CHI TIẾT CÁC VỊ THẾ ĐANG CHẠY", msg)
+        self.assertIn("BTC/USDT", msg)
+        self.assertIn("0.0200 BTC", msg)
+        self.assertIn("+$19.40", msg)
+        self.assertIn("🟢", msg)
+
+        # Check action buttons
+        btn_texts = [btn.text for row in keyboard for btn in row]
+        self.assertTrue(any("Đóng #1 BTC/USDT" in t for t in btn_texts))
+        self.assertTrue(any("ĐÓNG TẤT CẢ VỊ THẾ" in t for t in btn_texts))
+        self.assertTrue(any("LÀM MỚI SỔ LỆNH" in t for t in btn_texts))
+
 
 if __name__ == "__main__":
     unittest.main()

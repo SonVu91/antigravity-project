@@ -31,7 +31,7 @@ class PortfolioReporter:
         """
         Aggregate full financial state across CEX, DEX, and Database records.
         """
-        prices = current_prices or {}
+        prices = dict(current_prices or {})
         ada_usd = prices.get(settings.CEX_ADA_PAIR, prices.get("ADA/USDT", 0.85))
         night_ada = prices.get(settings.DEX_NIGHT_PAIR, prices.get("NIGHT/ADA", 0.125))
         night_usd = prices.get(settings.CEX_NIGHT_PAIR, prices.get("NIGHT/USDT", night_ada * ada_usd))
@@ -44,21 +44,45 @@ class PortfolioReporter:
             settings.CEX_NIGHT_PAIR: night_usd,
             settings.DEX_NIGHT_PAIR: night_ada,
         }
+        full_prices.update(prices)
 
         cex = self.executor.cex_sim
         dex = self.executor.dex_sim
 
-        # 1. CEX Assets
+        # Ensure full_prices has pricing for all coins currently held
+        for asset in cex.holdings.keys():
+            sym = f"{asset}/USDT"
+            if sym not in full_prices:
+                for t in cex.open_trades.values():
+                    if t.get("asset") == sym or t.get("asset") == asset:
+                        full_prices[sym] = t.get("entry_price", 0.0)
+                        break
+
+        # 1. CEX Assets & Dynamic Holdings
         cex_usdt_avail = cex.usdt_balance
-        cex_ada_holding = cex.holdings.get("ADA", 0.0)
-        cex_night_holding = cex.holdings.get("NIGHT", 0.0)
         cex_nav_usdt = cex.get_portfolio_nav(full_prices)
+
+        cex_holdings_display = []
+        for asset, qty in sorted(cex.holdings.items()):
+            if qty > 1e-6:
+                if qty == int(qty):
+                    cex_holdings_display.append(f"{qty:,.1f} {asset}")
+                elif qty >= 1.0:
+                    cex_holdings_display.append(f"{qty:,.2f} {asset}")
+                else:
+                    cex_holdings_display.append(f"{qty:.4f} {asset}")
+        cex_holdings_str = ", ".join(cex_holdings_display) if cex_holdings_display else "Trống"
 
         # 2. DEX Assets
         dex_ada_avail = dex.ada_balance
         dex_night_holding = dex.night_balance
         dex_nav_ada = dex.get_portfolio_nav_in_ada({"NIGHT/ADA": night_ada})
         dex_nav_usd = dex_nav_ada * ada_usd
+
+        dex_holdings_display = []
+        if dex_night_holding > 1e-4:
+            dex_holdings_display.append(f"{dex_night_holding:,.0f} NIGHT")
+        dex_holdings_str = ", ".join(dex_holdings_display) if dex_holdings_display else "Trống"
 
         # 3. Total Combined Portfolio Value
         total_nav_usd = cex_nav_usdt + dex_nav_usd
@@ -115,8 +139,10 @@ class PortfolioReporter:
             "night_ada_price": night_ada,
             "cex": {
                 "usdt_available": cex_usdt_avail,
-                "ada_holding": cex_ada_holding,
-                "night_holding": cex_night_holding,
+                "ada_holding": cex.holdings.get("ADA", 0.0),
+                "night_holding": cex.holdings.get("NIGHT", 0.0),
+                "holdings_str": cex_holdings_str,
+                "holdings": dict(cex.holdings),
                 "nav_usdt": cex_nav_usdt,
                 "open_count": len(cex_open),
                 "unrealized_usdt": unrealized_cex_usdt,
@@ -124,6 +150,7 @@ class PortfolioReporter:
             },
             "dex": {
                 "ada_available": dex_ada_avail,
+                "holdings_str": dex_holdings_str,
                 "night_holding": dex_night_holding,
                 "nav_ada": dex_nav_ada,
                 "nav_usd": dex_nav_usd,
@@ -176,13 +203,13 @@ class PortfolioReporter:
         # CEX overview
         lines.append(
             f"• 🏦 *CEX:* `${cex['nav_usdt']:,.2f} USDT` "
-            f"(Rảnh: `${cex['usdt_available']:,.2f}` | Giữ: `{cex['ada_holding']:,.1f} ADA`, `{cex['night_holding']:,.0f} NIGHT`)"
+            f"(Rảnh: `${cex['usdt_available']:,.2f}` | Giữ: `{cex['holdings_str']}`)"
         )
 
         # Cardano DEX overview
         lines.append(
             f"• 🥞 *Cardano DEX:* `{dex['nav_ada']:,.2f} ADA` (~`${dex['nav_usd']:,.2f}`) "
-            f"(Rảnh: `{dex['ada_available']:,.2f} ADA` | Giữ: `{dex['night_holding']:,.0f} NIGHT`)"
+            f"(Rảnh: `{dex['ada_available']:,.2f} ADA` | Giữ: `{dex['holdings_str']}`)"
         )
 
         # Combined Total NAV
@@ -212,11 +239,13 @@ class PortfolioReporter:
 
         balances_to_sync = [
             ("CEX", "USDT", cex.usdt_balance, cex.usdt_balance, 0.0),
-            ("CEX", "ADA", cex.holdings.get("ADA", 0.0), cex.holdings.get("ADA", 0.0), 0.0),
-            ("CEX", "NIGHT", cex.holdings.get("NIGHT", 0.0), cex.holdings.get("NIGHT", 0.0), 0.0),
             ("DEX", "ADA", dex.ada_balance, dex.ada_balance, 0.0),
             ("DEX", "NIGHT", dex.night_balance, dex.night_balance, 0.0),
         ]
+        # Dynamically record all non-USDT coins in CEX holdings
+        for asset, qty in cex.holdings.items():
+            if asset != "USDT":
+                balances_to_sync.append(("CEX", asset, qty, qty, 0.0))
 
         try:
             async with get_session() as session:

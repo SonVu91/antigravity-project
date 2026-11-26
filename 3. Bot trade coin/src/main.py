@@ -219,7 +219,7 @@ class SentinelApplication:
                     sentiment_score=sentiment_score,
                     whale_inflow=sum(w["amount"] for w in whale_txs if w["asset"] == "ADA"),
                 )
-                await self._handle_signal_execution(ada_signal, ada_candles, market_data={})
+                await self._handle_signal_execution(ada_signal, ada_candles, market_data={}, current_prices=current_prices)
 
         # 7. Sinh tín hiệu AI cho NIGHT/ADA (🥞 Cardano DEX) với tính năng Lead-Lag
         lead_lag_data = FeatureExtractor.calculate_lead_lag_features(
@@ -237,7 +237,7 @@ class SentinelApplication:
                     lead_lag_data=lead_lag_data,
                     whale_inflow=sum(w["amount"] for w in whale_txs if w["asset"] == "NIGHT"),
                 )
-                await self._handle_signal_execution(night_dex_signal, night_candles, market_data={"pool_reserves": dex_night_res})
+                await self._handle_signal_execution(night_dex_signal, night_candles, market_data={"pool_reserves": dex_night_res}, current_prices=current_prices)
 
         # 8. Quét các đồng coin bổ sung trong danh sách theo dõi (Watched Coins)
         for coin_pair in rm.watched_coins:
@@ -255,7 +255,7 @@ class SentinelApplication:
                             df=df_coin,
                             sentiment_score=sentiment_score,
                         )
-                        await self._handle_signal_execution(coin_sig, coin_candles, market_data={})
+                        await self._handle_signal_execution(coin_sig, coin_candles, market_data={}, current_prices=current_prices)
             except Exception as e:
                 logger.debug(f"Bỏ qua quét phụ cho {coin_pair}: {e}")
 
@@ -283,7 +283,7 @@ class SentinelApplication:
 
         logger.info("--- HOÀN TẤT CHU KỲ QUÉT THỊ TRƯỜNG ---")
 
-    async def _handle_signal_execution(self, signal: dict, candles: list, market_data: dict) -> None:
+    async def _handle_signal_execution(self, signal: dict, candles: list, market_data: dict, current_prices: Optional[dict] = None) -> None:
         action = signal.get("action")
         asset = signal.get("asset")
         market_type = signal.get("market_type", "CEX")
@@ -363,9 +363,13 @@ class SentinelApplication:
                 trade = exec_result["trade"]
                 exec_badge = "🥞 CARDANO DEX" if trade['market_type'] == "DEX" else "🏦 CEX"
                 fee_unit = "ADA" if trade['market_type'] == "DEX" else "USDT"
+                cur_prices = dict(current_prices or {})
+                if asset not in cur_prices and "suggested_params" in signal:
+                    cur_prices[asset] = signal["suggested_params"].get("entry_price", 0.0)
                 report_block = await self.executor.reporter.format_telegram_report(
                     trigger_type="EXECUTE",
                     trade_info=trade,
+                    current_prices=cur_prices,
                 )
                 exec_msg = (
                     f"✅ Khớp lệnh Giả lập thành công trên {exec_badge}:\n"

@@ -253,7 +253,7 @@ class StrategyExecutor:
         if trade_id in self.cex_sim.open_trades:
             trade = self.cex_sim.open_trades[trade_id]
             symbol = trade["asset"]
-            price = current_price or (0.85 if "ADA" in symbol else 0.10)
+            price = current_price or trade.get("entry_price", 0.0)
             closed_list = self.cex_sim.check_open_positions({symbol: price * 1.5})  # Force close
             if not closed_list:
                 # Direct manual close
@@ -262,6 +262,8 @@ class StrategyExecutor:
                 fee = (price * qty) * self.cex_sim.taker_fee_pct
                 net_pnl = pnl - fee - trade["fee_paid"]
                 self.cex_sim.usdt_balance += (price * qty) - fee
+                base_asset = symbol.split("/")[0]
+                self.cex_sim.holdings[base_asset] = max(0.0, self.cex_sim.holdings.get(base_asset, 0.0) - qty)
                 trade["exit_price"] = price
                 trade["exit_time"] = datetime.now(timezone.utc)
                 trade["status"] = "CLOSED"
@@ -280,7 +282,7 @@ class StrategyExecutor:
         # Check DEX
         if trade_id in self.dex_sim.open_positions:
             trade = self.dex_sim.open_positions[trade_id]
-            price = current_price or 0.125
+            price = current_price or trade.get("entry_price", 0.125)
             qty = trade["quantity"]
             net_ada = (price * qty) - (self.dex_sim.batcher_fee_ada + self.dex_sim.network_fee_ada)
             pnl_ada = net_ada - trade["cost_basis"]
@@ -360,3 +362,123 @@ class StrategyExecutor:
 
     # Alias for compatibility
     get_open_trades_categorized = get_open_positions_categorized
+
+    def format_detailed_orders_report(self, current_prices: Optional[Dict[str, float]] = None) -> Tuple[str, List[List[Any]]]:
+        """
+        Format comprehensive order book for all open positions across CEX and DEX.
+        Returns:
+            (formatted_markdown_text, inline_keyboard_buttons)
+        """
+        from datetime import timedelta
+        from telegram import InlineKeyboardButton
+
+        prices = current_prices or {}
+        categorized = self.get_open_positions_categorized(prices)
+        cex_list = categorized["cex"]
+        dex_list = categorized["dex"]
+        total_open = len(cex_list) + len(dex_list)
+
+        if total_open == 0:
+            msg = (
+                "📋 *SỔ LỆNH CHI TIẾT CÁC VỊ THẾ ĐANG CHẠY*\n\n"
+                "ℹ️ _Hiện tại không có vị thế nào đang mở._\n"
+                "Toàn bộ vốn đang ở trạng thái tiền rảnh (Cash) sẵn sàng đón nhận cơ hội mới!"
+            )
+            keyboard = [
+                [InlineKeyboardButton("🔄 LÀM MỚI SỔ LỆNH", callback_data="menu:orders")],
+                [InlineKeyboardButton("🔙 MENU CHÍNH", callback_data="main_menu")],
+            ]
+            return msg, keyboard
+
+        lines = [
+            "📋 *SỔ LỆNH CHI TIẾT CÁC VỊ THẾ ĐANG CHẠY*\n",
+        ]
+        keyboard = []
+        total_unrealized_usd = 0.0
+
+        ada_price = prices.get(settings.CEX_ADA_PAIR, prices.get("ADA/USDT", 0.85))
+
+        order_idx = 1
+        if cex_list:
+            lines.append("🏦 *SÀN TẬP TRUNG (CEX - Tài khoản USDT):*")
+            for t in cex_list:
+                sym = t["asset"]
+                side_badge = "🟢 BUY" if t["side"] == "BUY" else "🔴 SELL"
+                pnl = t["unrealized_pnl"]
+                pnl_pct = t["unrealized_pnl_pct"]
+                total_unrealized_usd += pnl
+                pnl_icon = "🟢" if pnl >= 0 else "🔴"
+                pnl_sign = "+" if pnl >= 0 else ""
+
+                t_time = t.get("entry_time")
+                if isinstance(t_time, datetime):
+                    time_str = (t_time + timedelta(hours=7)).strftime("%H:%M %d/%m")
+                else:
+                    time_str = "Vừa mở"
+
+                cur_p = t["current_price"]
+                entry_p = t["entry_price"]
+                qty = t["quantity"]
+                cost = t.get("cost_basis", cur_p * qty)
+
+                card = (
+                    f"*{order_idx}. {side_badge} `{sym}`* `(#{t['trade_id']})`\n"
+                    f"• Khối lượng: `{qty:,.4f} {sym.split('/')[0]}` (~`${cost:,.2f} USDT`)\n"
+                    f"• Giá mua: `${entry_p:,.4f}` ➔ Hiện tại: `${cur_p:,.4f}`\n"
+                    f"• Stop-Loss: `${t['stop_loss']:,.4f}` | Take-Profit: `${t['take_profit']:,.4f}`\n"
+                    f"• Lãi/Lỗ tạm tính: {pnl_icon} `{pnl_sign}${pnl:,.2f}` (`{pnl_pct:+.2f}%`)\n"
+                    f"• Thời gian vào: `{time_str}` (UTC+7)"
+                )
+                lines.append(card)
+                keyboard.append([InlineKeyboardButton(f"🛑 Đóng #{order_idx} {sym} ({pnl_sign}${pnl:,.2f})", callback_data=f"close:{t['trade_id']}")])
+                order_idx += 1
+
+        if dex_list:
+            lines.append("\n🥞 *SÀN PHI TẬP TRUNG (CARDANO DEX - eUTxO):*")
+            for t in dex_list:
+                sym = t["asset"]
+                side_badge = "🟢 BUY" if t["side"] == "BUY" else "🔴 SELL"
+                pnl_ada = t["unrealized_pnl"]
+                pnl_pct = t["unrealized_pnl_pct"]
+                pnl_usd = pnl_ada * ada_price
+                total_unrealized_usd += pnl_usd
+                pnl_icon = "🟢" if pnl_ada >= 0 else "🔴"
+                pnl_sign = "+" if pnl_ada >= 0 else ""
+
+                t_time = t.get("entry_time")
+                if isinstance(t_time, datetime):
+                    time_str = (t_time + timedelta(hours=7)).strftime("%H:%M %d/%m")
+                else:
+                    time_str = "Vừa mở"
+
+                cur_p = t["current_price"]
+                entry_p = t["entry_price"]
+                qty = t["quantity"]
+                cost = t.get("cost_basis", cur_p * qty)
+
+                card = (
+                    f"*{order_idx}. {side_badge} `{sym}`* `(#{t['trade_id']})`\n"
+                    f"• Khối lượng: `{qty:,.2f} {sym.split('/')[0]}` (~`{cost:,.2f} ADA`)\n"
+                    f"• Tỷ giá mua: `{entry_p:.4f} ADA` ➔ Hiện tại: `{cur_p:.4f} ADA`\n"
+                    f"• Stop-Loss: `{t['stop_loss']:.4f}` | Take-Profit: `{t['take_profit']:.4f}`\n"
+                    f"• Lãi/Lỗ tạm tính: {pnl_icon} `{pnl_sign}{pnl_ada:,.2f} ADA` (~`${pnl_usd:+,.2f}`) (`{pnl_pct:+.2f}%`)\n"
+                    f"• Thời gian vào: `{time_str}` (UTC+7)"
+                )
+                lines.append(card)
+                keyboard.append([InlineKeyboardButton(f"🛑 Đóng #{order_idx} {sym} ({pnl_sign}{pnl_ada:,.1f} ADA)", callback_data=f"close:{t['trade_id']}")])
+                order_idx += 1
+
+        unr_sign = "+" if total_unrealized_usd >= 0 else ""
+        unr_icon = "🟢" if total_unrealized_usd >= 0 else "🔴"
+        lines.append(
+            f"\n───────────────────────\n"
+            f"📊 *TỔNG KẾT:* `{total_open} vị thế đang mở` | PnL tạm tính: {unr_icon} *{unr_sign}${total_unrealized_usd:,.2f} USD*"
+        )
+
+        keyboard.append([InlineKeyboardButton("🛑 ĐÓNG TẤT CẢ VỊ THẾ", callback_data="close_all")])
+        keyboard.append([
+            InlineKeyboardButton("🔄 LÀM MỚI SỔ LỆNH", callback_data="menu:orders"),
+            InlineKeyboardButton("🔙 MENU CHÍNH", callback_data="main_menu"),
+        ])
+
+        return "\n".join(lines), keyboard

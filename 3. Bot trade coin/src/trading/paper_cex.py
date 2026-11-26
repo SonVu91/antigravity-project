@@ -28,7 +28,15 @@ class PaperCEXSimulator:
         """Calculate total Net Asset Value (NAV) in USDT"""
         nav = self.usdt_balance
         for asset, qty in self.holdings.items():
-            price = current_prices.get(f"{asset}/USDT", 0.0)
+            if qty <= 1e-6:
+                continue
+            price = current_prices.get(f"{asset}/USDT", current_prices.get(asset, 0.0))
+            if price <= 0.0:
+                # Fallback to entry_price of open trade for this asset
+                for t in self.open_trades.values():
+                    if t.get("asset", "").startswith(f"{asset}/"):
+                        price = t.get("entry_price", 0.0)
+                        break
             nav += qty * price
         return nav
 

@@ -106,7 +106,7 @@ class CEXCollector:
         logger.warning(f"All CEX exchanges failed to fetch OHLCV for {symbol} ({timeframe}): {last_error}. Generating synthetic bootstrap.")
         import numpy as np
         from datetime import timedelta
-        base_price = 0.85 if "ADA" in symbol else 0.10
+        base_price = 0.150 if "ADA" in symbol else 0.10
         fallback_candles = []
         now = datetime.now(timezone.utc)
         for i in range(limit, 0, -1):

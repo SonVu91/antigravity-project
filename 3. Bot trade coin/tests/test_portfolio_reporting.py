@@ -1,6 +1,11 @@
+import os
 import unittest
 import asyncio
 from datetime import datetime, timezone
+
+# Use isolated test database so production sentinel.db is never polluted
+os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./data/test_sentinel.db"
+
 from src.database.db_session import init_db, get_session
 from src.database.models import PaperTrade, PortfolioBalance
 from src.trading.strategy_executor import StrategyExecutor
@@ -11,7 +16,13 @@ class TestPortfolioReporting(unittest.TestCase):
     def setUp(self):
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-        self.loop.run_until_complete(init_db())
+        async def clean():
+            await init_db()
+            async with get_session() as session:
+                from sqlalchemy import text
+                await session.execute(text("DELETE FROM paper_trades"))
+                await session.execute(text("DELETE FROM portfolio_balances"))
+        self.loop.run_until_complete(clean())
         self.executor = StrategyExecutor()
         self.reporter = PortfolioReporter(self.executor)
 
@@ -32,11 +43,11 @@ class TestPortfolioReporting(unittest.TestCase):
         self.assertEqual(summary["dex"]["ada_available"], 10000.0)
         self.assertEqual(summary["dex"]["night_holding"], 0.0)
         self.assertEqual(summary["dex"]["nav_ada"], 10000.0)
-        # 10,000 ADA * 0.85 USD = 8,500 USD
-        self.assertEqual(summary["dex"]["nav_usd"], 8500.0)
+        # 10,000 ADA * 0.150 USD = 1,500 USD
+        self.assertEqual(summary["dex"]["nav_usd"], 1500.0)
 
-        # Combined Total NAV: 10,000 + 8,500 = 18,500 USD
-        self.assertEqual(summary["combined"]["total_nav_usd"], 18500.0)
+        # Combined Total NAV: 10,000 + 1,500 = 11,500 USD
+        self.assertEqual(summary["combined"]["total_nav_usd"], 11500.0)
 
     def test_02_format_telegram_report_on_execute(self):
         """Test formatting report after executing a manual trade"""

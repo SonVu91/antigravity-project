@@ -6,33 +6,49 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from config.settings import settings
 from src.database.models import Base
 
-# Ensure data directory exists
-data_dir = Path(settings.DATABASE_URL.replace("sqlite+aiosqlite:///", "")).parent
-os.makedirs(data_dir, exist_ok=True)
+_current_db_url = None
+_engine = None
 
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=False,
-    future=True,
-)
 
-async_session_factory = async_sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
+def get_db_url() -> str:
+    return os.environ.get("DATABASE_URL", settings.DATABASE_URL)
+
+
+def get_engine():
+    global _engine, _current_db_url
+    url = get_db_url()
+    if _engine is None or _current_db_url != url:
+        _current_db_url = url
+        clean_path = url.replace("sqlite+aiosqlite:///", "")
+        if clean_path and not clean_path.startswith(":"):
+            d_dir = Path(clean_path).parent
+            os.makedirs(d_dir, exist_ok=True)
+        _engine = create_async_engine(url, echo=False, future=True)
+    return _engine
+
+
+def get_session_factory():
+    eng = get_engine()
+    return async_sessionmaker(bind=eng, class_=AsyncSession, expire_on_commit=False)
+
+
+# Backward-compatible global references
+engine = get_engine()
+async_session_factory = get_session_factory()
 
 
 async def init_db() -> None:
     """Initialize database tables"""
-    async with engine.begin() as conn:
+    eng = get_engine()
+    async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
 
 @asynccontextmanager
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """Provide an async transaction session"""
-    async with async_session_factory() as session:
+    factory = get_session_factory()
+    async with factory() as session:
         try:
             yield session
             await session.commit()

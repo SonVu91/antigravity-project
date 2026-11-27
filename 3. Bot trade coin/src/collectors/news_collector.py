@@ -1,11 +1,13 @@
 import asyncio
 import logging
+import socket
 from datetime import datetime, timezone
 from typing import List, Dict, Any
 import aiohttp
 import feedparser
 
 logger = logging.getLogger("NewsCollector")
+socket.setdefaulttimeout(5.0)
 
 
 class NewsCollector:

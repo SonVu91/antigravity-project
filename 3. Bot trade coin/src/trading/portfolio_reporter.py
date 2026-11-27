@@ -32,7 +32,7 @@ class PortfolioReporter:
         Aggregate full financial state across CEX, DEX, and Database records.
         """
         prices = dict(current_prices or {})
-        ada_usd = prices.get(settings.CEX_ADA_PAIR, prices.get("ADA/USDT", 0.85))
+        ada_usd = prices.get(settings.CEX_ADA_PAIR, prices.get("ADA/USDT", 0.150))
         night_ada = prices.get(settings.DEX_NIGHT_PAIR, prices.get("NIGHT/ADA", 0.125))
         night_usd = prices.get(settings.CEX_NIGHT_PAIR, prices.get("NIGHT/USDT", night_ada * ada_usd))
 
@@ -193,11 +193,15 @@ class PortfolioReporter:
         if trigger_type == "CLOSE" and trade_info:
             pnl_val = trade_info.get("pnl", 0.0)
             pnl_pct = trade_info.get("pnl_pct", 0.0)
+            cost_b = trade_info.get("cost_basis", 0.0)
+            fee_p = trade_info.get("fee_paid", 0.0)
             unit = "ADA" if trade_info.get("market_type") == "DEX" else "USDT"
             pnl_icon = "🟢" if pnl_val >= 0 else "🔴"
             reason = trade_info.get("close_reason", "MANUAL")
             lines.append(
-                f"{pnl_icon} *Lệnh vừa chốt ({reason}):* `{pnl_val:+,.2f} {unit}` (`{pnl_pct:+.2f}%`)"
+                f"{pnl_icon} *Lệnh vừa chốt ({reason}):*\n"
+                f"  • Vốn vào lệnh: `{cost_b:,.2f} {unit}` | Phí: `{fee_p:,.4f} {unit}`\n"
+                f"  • Lời/Lỗ ròng: `{pnl_val:+,.2f} {unit}` (`{pnl_pct:+.2f}%`)"
             )
 
         # CEX overview

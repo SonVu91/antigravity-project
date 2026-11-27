@@ -9,6 +9,9 @@ import numpy as np
 # Ensure project root is in path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+# Use isolated test database so production sentinel.db is never polluted
+os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./data/test_sentinel.db"
+
 from config.settings import settings
 from src.database.db_session import init_db, get_session
 from src.database.models import Candle, WhaleTransaction, AISignal, PaperTrade

@@ -21,12 +21,12 @@ async def reset_paper_trading_data():
         now = datetime.now(timezone.utc)
         initial_balances = [
             PortfolioBalance(account_type="CEX", currency="USDT", total_balance=settings.PAPER_INITIAL_USDT, available_balance=settings.PAPER_INITIAL_USDT, locked_balance=0.0, updated_at=now),
-            PortfolioBalance(account_type="DEX", currency="ADA", total_balance=10000.0, available_balance=10000.0, locked_balance=0.0, updated_at=now),
+            PortfolioBalance(account_type="DEX", currency="ADA", total_balance=settings.PAPER_INITIAL_ADA, available_balance=settings.PAPER_INITIAL_ADA, locked_balance=0.0, updated_at=now),
             PortfolioBalance(account_type="DEX", currency="NIGHT", total_balance=0.0, available_balance=0.0, locked_balance=0.0, updated_at=now),
         ]
         session.add_all(initial_balances)
         await session.commit()
-        logger.info("✅ Đã đặt lại dữ liệu Paper Trading về trạng thái ban đầu sạch sẽ: $5,000 USDT (CEX), 10,000 ADA (DEX), 0 lệnh cũ.")
+        logger.info(f"✅ Đã đặt lại dữ liệu Paper Trading về trạng thái ban đầu sạch sẽ: ${settings.PAPER_INITIAL_USDT:,.0f} USDT (CEX), {settings.PAPER_INITIAL_ADA:,.0f} ADA (DEX), 0 lệnh cũ.")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 {
   "bot_mode": "paper_trading",
+  "cex_order_size_usdt": 100.0,
+  "dex_order_size_ada": 200.0,
   "max_risk_pct": 2.0,
   "atr_sl_multiplier": 1.8,
   "tp_rr_ratio": 3.0,
@@ -13,5 +15,5 @@
     "BTC/USDT",
     "NIGHT/ADA"
   ],
-  "updated_at": "2026-11-26T10:02:04.359222+00:00"
+  "updated_at": "2026-11-27T01:23:52.703805+00:00"
 }

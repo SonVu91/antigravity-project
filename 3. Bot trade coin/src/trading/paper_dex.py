@@ -30,7 +30,7 @@ class PaperDEXSimulator:
         """Calculate total wallet portfolio value in ADA"""
         nav = self.ada_balance
         # USDC in ADA
-        ada_usdc_price = current_prices_in_ada.get("ADA/USDC", 0.85)
+        ada_usdc_price = current_prices_in_ada.get("ADA/USDC", 0.150)
         if ada_usdc_price > 0:
             nav += self.usdc_balance / ada_usdc_price
         # NIGHT in ADA

@@ -97,6 +97,7 @@ class StrategyExecutor:
                 entry_price=entry_price,
                 stop_loss=stop_loss,
                 confidence_score=confidence,
+                fixed_order_size=self.risk_manager.cex_order_size_usdt,
             )
             if not sizing["allowed"]:
                 return {"status": "REJECTED", "reason": sizing["reason"]}
@@ -115,7 +116,7 @@ class StrategyExecutor:
             current_nav_ada = self.dex_sim.get_portfolio_nav_in_ada({"NIGHT/ADA": entry_price})
             self.peak_nav_dex = max(self.peak_nav_dex, current_nav_ada)
 
-            ada_amount_in = self.dex_sim.ada_balance * (self.risk_manager.max_risk_pct / 100.0) * 5.0
+            ada_amount_in = min(self.dex_sim.ada_balance, self.risk_manager.dex_order_size_ada)
             pool_reserves = market_data.get("pool_reserves", {})
 
             result = await self.dex_sim.execute_swap(
@@ -169,7 +170,7 @@ class StrategyExecutor:
         if symbol_upper in ["ADA", "ADA/USDT"]:
             norm_symbol = "ADA/USDT"
             norm_market = "CEX" if not market_type else market_type.upper()
-            ref_price = current_price or 0.85
+            ref_price = current_price or 0.150
         elif symbol_upper in ["NIGHT", "NIGHT/ADA"]:
             norm_symbol = "NIGHT/ADA"
             norm_market = "DEX" if not market_type else market_type.upper()
@@ -198,8 +199,9 @@ class StrategyExecutor:
                     entry_price=ref_price,
                     stop_loss=sl,
                     confidence_score=0.85,
+                    fixed_order_size=self.risk_manager.cex_order_size_usdt,
                 )
-                qty = sizing["quantity"] if sizing["allowed"] else 100.0
+                qty = sizing["quantity"] if sizing["allowed"] else round(self.risk_manager.cex_order_size_usdt / ref_price, 4)
 
             res = self.cex_sim.execute_order(
                 symbol=norm_symbol,
@@ -210,8 +212,8 @@ class StrategyExecutor:
                 take_profit=tp,
             )
         else:  # DEX
-            ada_amount = amount if amount and amount > 0 else (self.dex_sim.ada_balance * (self.risk_manager.max_risk_pct / 100.0) * 5.0)
-            ada_amount = max(50.0, ada_amount)
+            ada_amount = amount if amount and amount > 0 else self.risk_manager.dex_order_size_ada
+            ada_amount = min(self.dex_sim.ada_balance, max(10.0, ada_amount))
 
             res = await self.dex_sim.execute_swap(
                 pair=norm_symbol,
@@ -254,30 +256,23 @@ class StrategyExecutor:
             trade = self.cex_sim.open_trades[trade_id]
             symbol = trade["asset"]
             price = current_price or trade.get("entry_price", 0.0)
-            closed_list = self.cex_sim.check_open_positions({symbol: price * 1.5})  # Force close
-            if not closed_list:
-                # Direct manual close
-                qty = trade["quantity"]
-                pnl = (price - trade["entry_price"]) * qty if trade["side"] == "BUY" else (trade["entry_price"] - price) * qty
-                fee = (price * qty) * self.cex_sim.taker_fee_pct
-                net_pnl = pnl - fee - trade["fee_paid"]
-                self.cex_sim.usdt_balance += (price * qty) - fee
-                base_asset = symbol.split("/")[0]
-                self.cex_sim.holdings[base_asset] = max(0.0, self.cex_sim.holdings.get(base_asset, 0.0) - qty)
-                trade["exit_price"] = price
-                trade["exit_time"] = datetime.now(timezone.utc)
-                trade["status"] = "CLOSED"
-                trade["pnl"] = round(net_pnl, 2)
-                trade["pnl_pct"] = round((net_pnl / trade["cost_basis"]) * 100.0, 2) if trade.get("cost_basis", 0) > 0 else 0.0
-                trade["close_reason"] = "MANUAL_CLOSE"
-                self.last_closed_trade = trade
-                del self.cex_sim.open_trades[trade_id]
-                self._dispatch_db_sync(trade)
-                return True, f"Đã đóng vị thế CEX `{trade['asset']}` (Lời/Lỗ: ${net_pnl:+,.2f})."
-            else:
-                self.last_closed_trade = closed_list[0]
-                self._dispatch_db_sync(closed_list[0])
-                return True, f"Đã đóng vị thế CEX `{trade['asset']}` (Lời/Lỗ: ${closed_list[0].get('pnl', 0.0):+,.2f})."
+            qty = trade["quantity"]
+            pnl = (price - trade["entry_price"]) * qty if trade["side"] == "BUY" else (trade["entry_price"] - price) * qty
+            fee = (price * qty) * self.cex_sim.taker_fee_pct
+            net_pnl = pnl - fee - trade["fee_paid"]
+            self.cex_sim.usdt_balance += (price * qty) - fee
+            base_asset = symbol.split("/")[0]
+            self.cex_sim.holdings[base_asset] = max(0.0, self.cex_sim.holdings.get(base_asset, 0.0) - qty)
+            trade["exit_price"] = price
+            trade["exit_time"] = datetime.now(timezone.utc)
+            trade["status"] = "CLOSED"
+            trade["pnl"] = round(net_pnl, 2)
+            trade["pnl_pct"] = round((net_pnl / trade["cost_basis"]) * 100.0, 2) if trade.get("cost_basis", 0) > 0 else 0.0
+            trade["close_reason"] = "MANUAL_CLOSE"
+            self.last_closed_trade = trade
+            del self.cex_sim.open_trades[trade_id]
+            self._dispatch_db_sync(trade)
+            return True, f"Đã đóng vị thế CEX `{trade['asset']}` (Lời/Lỗ: ${net_pnl:+,.2f})."
 
         # Check DEX
         if trade_id in self.dex_sim.open_positions:
@@ -396,7 +391,7 @@ class StrategyExecutor:
         keyboard = []
         total_unrealized_usd = 0.0
 
-        ada_price = prices.get(settings.CEX_ADA_PAIR, prices.get("ADA/USDT", 0.85))
+        ada_price = prices.get(settings.CEX_ADA_PAIR, prices.get("ADA/USDT", 0.150))
 
         order_idx = 1
         if cex_list:

@@ -494,12 +494,16 @@ class TelegramSentinelBot:
             f"• Danh sách Coin theo dõi: `{coins_display}`\n\n"
             "🛡️ *QUẢN LÝ VỐN & THÔNG SỐ LỆNH:*\n"
             f"• Chế độ vận hành: {mode_icon} `{mode_text}`\n"
+            f"• Vốn vào mỗi lệnh CEX: `${s.get('cex_order_size_usdt', 100.0):,.2f} USDT`\n"
+            f"• Vốn vào mỗi lệnh DEX: `{s.get('dex_order_size_ada', 200.0):,.2f} ADA`\n"
             f"• Tỷ lệ Rủi ro / Vị thế: `{s['max_risk_pct']}% NAV`\n"
             f"• Cắt lỗ (SL): `{s['atr_sl_multiplier']}x ATR`\n"
             f"• Chốt lời (TP): `1:{s['tp_rr_ratio']} R:R`\n"
             f"• Ngưỡng Circuit Breaker: `{s['circuit_breaker_limit_pct']}% Drawdown`\n"
             f"• Ngưỡng Cảnh báo Arbitrage: `{s['arbitrage_threshold_pct']}% Spread`\n\n"
             "💡 *CÚ PHÁP GÕ TRỰC TIẾP ĐỂ THAY ĐỔI:*\n"
+            "• `/set order_size <tiền>` : Vốn vào lệnh CEX (ví dụ: `/set order_size 100`)\n"
+            "• `/set dex_order_size <ADA>` : Vốn vào lệnh DEX (ví dụ: `/set dex_order_size 200`)\n"
             "• `/set tf <khung>` : Đổi khung nến (ví dụ: `/set tf 4h`, `15m`, `1h`, `1d`)\n"
             "• `/set hours <giờ>` : Đổi giờ chạy (ví dụ: `/set hours 08:00-23:00` hoặc `/set hours 24/7`)\n"
             "• `/set coins <danh_sách>` : Đặt lại coin (ví dụ: `/set coins BTC,ETH,ADA,SOL`)\n"
@@ -560,6 +564,8 @@ class TelegramSentinelBot:
                 "ℹ️ *HƯỚNG DẪN CÚ PHÁP GÕ TRỰC TIẾP LỆNH /set:*\n"
                 "`/set <tên_thông_số> <giá_trị>`\n\n"
                 "Ví dụ mẫu thực tế:\n"
+                "• `/set order_size 100` : Đổi vốn vào mỗi lệnh CEX ($100 USDT)\n"
+                "• `/set dex_order_size 200` : Đổi vốn vào mỗi lệnh DEX (200 ADA)\n"
                 "• `/set tf 4h` : Đổi khung nến quét sang 4h (15m, 1h, 4h, 1d)\n"
                 "• `/set hours 08:00-23:00` : Cài khung giờ giao dịch (UTC+7)\n"
                 "• `/set hours 24/7` : Chạy giao dịch 24/7 không nghỉ\n"
@@ -782,7 +788,7 @@ class TelegramSentinelBot:
         market_type = "DEX" if ("NIGHT" in symbol_upper and "USDT" not in symbol_upper) else "CEX"
         market_badge = "🥞 CARDANO DEX (Minswap)" if market_type == "DEX" else "🏦 CEX (Binance)"
 
-        ref_price = 0.85 if "ADA" in symbol_upper else (0.125 if market_type == "DEX" else 0.10)
+        ref_price = 0.150 if "ADA" in symbol_upper else (0.125 if market_type == "DEX" else 0.10)
         cost_desc = f"{amount:,.0f} đơn vị" if amount else "Tự động tính theo Kelly 1.5% NAV"
 
         msg = (
@@ -934,7 +940,7 @@ class TelegramSentinelBot:
             parts = data.split(":")
             symbol, side, market = parts[1], parts[2], parts[3]
             badge = "🥞 CARDANO DEX (Minswap)" if market == "DEX" else "🏦 CEX (Binance)"
-            ref_price = 0.85 if "ADA" in symbol else (0.125 if market == "DEX" else 0.10)
+            ref_price = 0.150 if "ADA" in symbol else (0.125 if market == "DEX" else 0.10)
 
             confirm_msg = (
                 "⚠️ *XÁC NHẬN THỰC THI LỆNH TÍN HIỆU*\n\n"

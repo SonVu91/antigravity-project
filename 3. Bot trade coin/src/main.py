@@ -110,7 +110,7 @@ class SentinelApplication:
         df_night = pd.DataFrame(night_candles) if night_candles else pd.DataFrame()
 
         cex_night_usd = float(df_night["close"].iloc[-1]) if not df_night.empty else 0.10
-        cex_ada_usd = float(df_ada["close"].iloc[-1]) if not df_ada.empty else 0.85
+        cex_ada_usd = float(df_ada["close"].iloc[-1]) if not df_ada.empty else 0.150
         dex_night_ada_ratio = float(dex_night_res.get("price", 0.125))
 
         now = datetime.now(timezone.utc)
@@ -280,11 +280,14 @@ class SentinelApplication:
                 current_prices=current_prices,
             )
             market_badge = "🏦 CEX" if trade['market_type'] == "CEX" else "🥞 CARDANO DEX"
+            fee_unit = "ADA" if trade['market_type'] == "DEX" else "USDT"
             pnl_msg = (
                 f"Đã đóng vị thế {trade['asset']} trên {market_badge}:\n"
                 f"• Lý do: `{trade.get('close_reason')}`\n"
-                f"• Lời/Lỗ: `{trade.get('pnl'):+,.2f}` ({trade.get('pnl_pct'):+.2f}%)\n"
-                f"• Giá thoát: `{trade.get('exit_price')}`\n\n"
+                f"• Vốn vào lệnh: `{trade.get('cost_basis', 0.0):,.2f} {fee_unit}`\n"
+                f"• Giá thoát: `{trade.get('exit_price')}`\n"
+                f"• Phí đã trừ: `{trade.get('fee_paid', 0.0):,.4f} {fee_unit}`\n"
+                f"• Lời/Lỗ ròng: `{trade.get('pnl'):+,.2f} {fee_unit}` ({trade.get('pnl_pct'):+.2f}%)\n\n"
                 f"{report_block}"
             )
             await self.telegram_bot.send_alert("CHỐT VỊ THẾ PAPER TRADING", pnl_msg)
@@ -379,10 +382,13 @@ class SentinelApplication:
                     trade_info=trade,
                     current_prices=cur_prices,
                 )
+                cost_val = trade.get('cost_basis', 0.0)
+                qty_str = f"{trade['quantity']:,.6f}" if trade['entry_price'] > 1000 else f"{trade['quantity']:,.2f}"
                 exec_msg = (
                     f"✅ Khớp lệnh Giả lập thành công trên {exec_badge}:\n"
                     f"• Mã lệnh: `{trade['trade_id']}`\n"
-                    f"• {trade['side']} `{trade['quantity']:,.2f} {asset.split('/')[0]}`\n"
+                    f"• {trade['side']} `{qty_str} {asset.split('/')[0]}`\n"
+                    f"• Vốn vào lệnh: `{cost_val:,.2f} {fee_unit}`\n"
                     f"• Giá khớp: `{trade['entry_price']}`\n"
                     f"• Phí đã trừ: `{trade['fee_paid']} {fee_unit}`\n"
                     f"• Trượt giá: `{trade['slippage']}%\n\n`"

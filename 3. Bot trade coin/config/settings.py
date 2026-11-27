@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     PAPER_INITIAL_NIGHT: float = 0.0
 
     # Risk Management
+    DEFAULT_CEX_ORDER_SIZE_USDT: float = 100.0
+    DEFAULT_DEX_ORDER_SIZE_ADA: float = 200.0
     MAX_RISK_PER_TRADE_PCT: float = 1.5
     CIRCUIT_BREAKER_DRAWDOWN_PCT: float = 5.0
     ATR_SL_MULTIPLIER: float = 1.5

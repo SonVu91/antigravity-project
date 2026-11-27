@@ -3,7 +3,7 @@ import logging
 import re
 from datetime import datetime, timezone, timedelta, time
 from pathlib import Path
-from typing import Dict, Any, Tuple, List
+from typing import Dict, Any, Tuple, List, Optional
 from config.settings import settings
 
 logger = logging.getLogger("RiskManager")
@@ -20,6 +20,8 @@ class RiskManager:
 
     def __init__(self):
         self.bot_mode = settings.BOT_MODE  # paper_trading or alert_only
+        self.cex_order_size_usdt: float = getattr(settings, "DEFAULT_CEX_ORDER_SIZE_USDT", 100.0)
+        self.dex_order_size_ada: float = getattr(settings, "DEFAULT_DEX_ORDER_SIZE_ADA", 200.0)
         self.max_risk_pct = settings.MAX_RISK_PER_TRADE_PCT  # e.g., 1.5%
         self.circuit_breaker_limit_pct = settings.CIRCUIT_BREAKER_DRAWDOWN_PCT  # e.g., 5.0%
         self.atr_sl_multiplier = settings.ATR_SL_MULTIPLIER  # e.g., 1.5
@@ -79,6 +81,8 @@ class RiskManager:
         """Persist current configuration to JSON file"""
         data = {
             "bot_mode": self.bot_mode,
+            "cex_order_size_usdt": self.cex_order_size_usdt,
+            "dex_order_size_ada": self.dex_order_size_ada,
             "max_risk_pct": self.max_risk_pct,
             "atr_sl_multiplier": self.atr_sl_multiplier,
             "tp_rr_ratio": self.tp_rr_ratio,
@@ -105,6 +109,8 @@ class RiskManager:
             with open(self.config_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
             self.bot_mode = data.get("bot_mode", self.bot_mode)
+            self.cex_order_size_usdt = float(data.get("cex_order_size_usdt", self.cex_order_size_usdt))
+            self.dex_order_size_ada = float(data.get("dex_order_size_ada", self.dex_order_size_ada))
             self.max_risk_pct = float(data.get("max_risk_pct", self.max_risk_pct))
             self.atr_sl_multiplier = float(data.get("atr_sl_multiplier", self.atr_sl_multiplier))
             self.tp_rr_ratio = float(data.get("tp_rr_ratio", self.tp_rr_ratio))
@@ -231,9 +237,25 @@ class RiskManager:
                 else:
                     return False, "Chế độ hợp lệ: paper_trading hoặc alert_only."
 
+            elif key_lower in ["order_size", "size", "vol", "volume", "cex_order_size", "tien_vao_lenh"]:
+                val = float(value)
+                if val <= 1 or val > 50000:
+                    return False, "Kích thước lệnh CEX phải từ $10 đến $50,000 USDT."
+                self.cex_order_size_usdt = val
+                self.save_settings_to_file()
+                return True, f"Đã cập nhật Vốn vào mỗi lệnh CEX: ${self.cex_order_size_usdt:,.2f} USDT."
+
+            elif key_lower in ["dex_order_size", "dex_size", "dex_vol", "dex_lenh"]:
+                val = float(value)
+                if val <= 5 or val > 100000:
+                    return False, "Kích thước lệnh DEX phải từ 10 đến 100,000 ADA."
+                self.dex_order_size_ada = val
+                self.save_settings_to_file()
+                return True, f"Đã cập nhật Vốn vào mỗi lệnh DEX: {self.dex_order_size_ada:,.2f} ADA."
+
             return False, (
                 f"Không tìm thấy thông số '{key}'.\n"
-                "Các thông số hợp lệ: tf, hours, coins, add_coin, remove_coin, risk, sl, tp, breaker, spread, mode."
+                "Các thông số hợp lệ: order_size, dex_order_size, tf, hours, coins, add_coin, remove_coin, risk, sl, tp, breaker, spread, mode."
             )
         except Exception as e:
             return False, f"Lỗi định dạng giá trị: {e}"
@@ -242,6 +264,8 @@ class RiskManager:
         """Return dict of current settings"""
         return {
             "bot_mode": self.bot_mode,
+            "cex_order_size_usdt": self.cex_order_size_usdt,
+            "dex_order_size_ada": self.dex_order_size_ada,
             "max_risk_pct": self.max_risk_pct,
             "atr_sl_multiplier": self.atr_sl_multiplier,
             "tp_rr_ratio": self.tp_rr_ratio,
@@ -275,13 +299,13 @@ class RiskManager:
         self,
         capital: float,
         entry_price: float,
-        stop_loss: float,
+        stop_loss: float = 0.0,
         confidence_score: float = 0.70,
+        fixed_order_size: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
-        Calculate position sizing using adjusted Kelly Criterion:
-        Risk Amount = Capital * max_risk_pct
-        Position Quantity = Risk Amount / (Price - StopLoss)
+        Calculate position sizing.
+        Uses fixed order size (default $100 USDT) with safety checks against available capital.
         """
         if self.is_circuit_breaker_active:
             return {
@@ -291,28 +315,35 @@ class RiskManager:
                 "cost_basis": 0.0,
             }
 
-        risk_per_unit = abs(entry_price - stop_loss)
-        if risk_per_unit <= 0 or entry_price <= 0:
-            return {"allowed": False, "reason": "Khoảng cách Stop-Loss không hợp lệ.", "quantity": 0.0, "cost_basis": 0.0}
+        if entry_price <= 0:
+            return {"allowed": False, "reason": "Giá vào lệnh không hợp lệ.", "quantity": 0.0, "cost_basis": 0.0}
 
-        # Half-Kelly multiplier adjusted by AI confidence
-        effective_risk_pct = self.max_risk_pct * min(1.2, max(0.5, confidence_score))
-        max_risk_dollars = capital * (effective_risk_pct / 100.0)
+        target_cost = fixed_order_size if (fixed_order_size and fixed_order_size > 0) else self.cex_order_size_usdt
+        if capital < 10.0:
+            return {
+                "allowed": False,
+                "reason": f"Số dư USDT không đủ tối thiểu $10.00 (hiện có: ${capital:,.2f}).",
+                "quantity": 0.0,
+                "cost_basis": 0.0,
+            }
 
-        units = max_risk_dollars / risk_per_unit
-        cost = units * entry_price
+        # Cap cost to available capital
+        if target_cost > capital:
+            target_cost = capital
 
-        # Cap max position cost to 25% of total capital to maintain liquidity
-        max_cost_cap = capital * 0.25
-        if cost > max_cost_cap:
-            cost = max_cost_cap
-            units = cost / entry_price
+        units = target_cost / entry_price
+        risk_per_unit = abs(entry_price - stop_loss) if (stop_loss and stop_loss > 0) else (entry_price * 0.03)
+        risk_amount = units * risk_per_unit
+        risk_pct = (risk_amount / capital) * 100.0 if capital > 0 else 0.0
+
+        # High-value coins (BTC) need higher precision
+        qty_precision = 6 if entry_price > 1000 else 4
 
         return {
             "allowed": True,
             "reason": "OK",
-            "quantity": round(units, 4),
-            "cost_basis": round(cost, 2),
-            "risk_amount": round(max_risk_dollars, 2),
-            "risk_pct": round(effective_risk_pct, 2),
+            "quantity": round(units, qty_precision),
+            "cost_basis": round(target_cost, 2),
+            "risk_amount": round(risk_amount, 2),
+            "risk_pct": round(risk_pct, 2),
         }
